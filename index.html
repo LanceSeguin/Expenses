@@ -1513,10 +1513,9 @@ async function scanReceiptWithVision() {
     // Step 2: Send to Vision API via Apps Script
     if (scanText) scanText.innerHTML = '<strong>Scanning Receipt</strong>Reading date, amount, vendor & items...';
 
-    const response = await fetch(CFG.webAppUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'scanReceipt', imageBase64: compressed, mimeType: sendMime })
+    const scanPayload = { action: 'scanReceipt', imageBase64: compressed, mimeType: sendMime };
+    const response = await fetch(CFG.webAppUrl + '?payload=' + encodeURIComponent(JSON.stringify(scanPayload)), {
+      method: 'GET',
     });
 
     if (!response.ok) throw new Error('Server returned ' + response.status);
@@ -1718,10 +1717,8 @@ async function loadCategories() {
   errEl.style.display = 'none';
   const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
   try {
-    const resp = await fetch(CFG.webAppUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'getCategories', business: STATE.business, year })
+    const resp = await fetch(CFG.webAppUrl + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'getCategories', business: STATE.business, year })), {
+      method: 'GET'
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
@@ -1849,10 +1846,8 @@ async function submitEntry() {
   };
 
   try {
-    const resp = await fetch(CFG.webAppUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(checkPayload)
+    const resp = await fetch(CFG.webAppUrl + '?payload=' + encodeURIComponent(JSON.stringify(checkPayload)), {
+      method: 'GET'
     });
     const result = await resp.json();
 
@@ -1991,10 +1986,8 @@ async function doSubmit(fileNameSuffix) {
   };
 
   try {
-    const resp = await fetch(CFG.webAppUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload)
+    const resp = await fetch(CFG.webAppUrl + '?payload=' + encodeURIComponent(JSON.stringify(payload)), {
+      method: 'GET'
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
