@@ -1,0 +1,2023 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+<title>Expense Entry</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg: #0f0f0f;
+    --surface: #1a1a1a;
+    --surface2: #222222;
+    --border: #2e2e2e;
+    --accent: #c8a96e;
+    --accent2: #e8c98e;
+    --text: #f0ede8;
+    --text-muted: #888880;
+    --text-dim: #555550;
+    --danger: #e05a4e;
+    --danger-bg: rgba(224,90,78,0.08);
+    --danger-border: rgba(224,90,78,0.25);
+    --success: #5ab882;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    font-weight: 400;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  #app {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    padding: 0 0 40px;
+  }
+
+  /* ── Top Bar ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 20px 0;
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    z-index: 10;
+  }
+  .topbar-logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: 0.02em;
+  }
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .topbar-step {
+    font-size: 12px;
+    color: var(--text-muted);
+    font-weight: 500;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+  .settings-btn {
+    background: transparent;
+    border: 1.5px solid var(--border);
+    border-radius: 8px;
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    color: var(--text-muted);
+    transition: border-color 0.15s, color 0.15s;
+    flex-shrink: 0;
+  }
+  .settings-btn:hover { border-color: var(--accent); color: var(--accent); }
+  .settings-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+
+  /* ── Progress Bar ── */
+  .progress-wrap { padding: 16px 20px 0; }
+  .progress-track { height: 2px; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    border-radius: 2px;
+    transition: width 0.4s cubic-bezier(0.4,0,0.2,1);
+  }
+
+  /* ── Screen ── */
+  .screen {
+    display: none;
+    flex-direction: column;
+    flex: 1;
+    padding: 28px 20px 20px;
+    animation: fadeUp 0.3s ease both;
+  }
+  .screen.active { display: flex; }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .screen-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--accent); margin-bottom: 8px;
+  }
+  .screen-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 28px; line-height: 1.15; color: var(--text); margin-bottom: 6px;
+  }
+  .screen-sub {
+    font-size: 13px; color: var(--text-muted); margin-bottom: 28px; line-height: 1.5;
+  }
+
+  /* ── Upload Zone ── */
+  .upload-zone {
+    border: 1.5px dashed var(--border);
+    border-radius: var(--radius);
+    padding: 48px 24px;
+    display: flex; flex-direction: column; align-items: center; gap: 12px;
+    cursor: pointer;
+    transition: border-color 0.2s, background 0.2s;
+    background: var(--surface);
+    position: relative;
+  }
+  .upload-zone:hover { border-color: var(--accent); background: rgba(200,169,110,0.05); }
+  .upload-zone input[type=file] {
+    position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; height: 100%;
+  }
+  .upload-icon {
+    width: 52px; height: 52px; background: var(--surface2);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  }
+  .upload-icon svg { width: 24px; height: 24px; stroke: var(--accent); fill: none; stroke-width: 1.5; }
+  .upload-title { font-size: 15px; font-weight: 600; color: var(--text); }
+  .upload-sub { font-size: 12px; color: var(--text-muted); text-align: center; }
+
+  .preview-wrap {
+    border-radius: var(--radius); overflow: hidden;
+    position: relative; margin-bottom: 12px; background: var(--surface);
+  }
+  .preview-wrap img { width: 100%; max-height: 280px; object-fit: contain; display: block; }
+  .preview-remove {
+    position: absolute; top: 8px; right: 8px;
+    background: rgba(0,0,0,0.7); border: none; border-radius: 50%;
+    width: 30px; height: 30px; display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: white; font-size: 16px;
+  }
+
+  .scan-overlay {
+    background: var(--surface); border-radius: var(--radius);
+    padding: 24px; display: flex; align-items: center; gap: 16px; margin-top: 12px;
+  }
+  .scan-spinner {
+    width: 32px; height: 32px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .scan-text { font-size: 13px; color: var(--text-muted); }
+  .scan-text strong { display: block; color: var(--text); font-size: 14px; margin-bottom: 2px; }
+
+  /* ── Checkbox Cards ── */
+  .checkbox-list { display: flex; flex-direction: column; gap: 10px; }
+  .checkbox-card {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 16px 18px;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s;
+  }
+  .checkbox-card:hover { border-color: var(--accent); }
+  .checkbox-card.selected { border-color: var(--accent); background: rgba(200,169,110,0.07); }
+  .checkbox-card input[type=checkbox], .checkbox-card input[type=radio] { display: none; }
+  .cb-box {
+    width: 20px; height: 20px; border: 1.5px solid var(--border);
+    border-radius: 5px; display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0; transition: border-color 0.15s, background 0.15s;
+  }
+  .checkbox-card.selected .cb-box { border-color: var(--accent); background: var(--accent); }
+  .cb-check { display: none; }
+  .checkbox-card.selected .cb-check { display: block; }
+  .cb-label { font-size: 15px; font-weight: 500; color: var(--text); flex: 1; }
+  .cb-sub { font-size: 12px; color: var(--text-muted); margin-top: 1px; }
+  .cb-badge {
+    font-size: 10px; font-weight: 600;
+    background: rgba(200,169,110,0.15); color: var(--accent);
+    padding: 3px 8px; border-radius: 20px;
+    letter-spacing: 0.06em; text-transform: uppercase;
+  }
+
+  /* Toggle Card */
+  .toggle-card {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface2); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px 18px;
+    cursor: pointer; margin-top: 14px; transition: border-color 0.15s;
+  }
+  .toggle-card.active { border-color: var(--accent); background: rgba(200,169,110,0.06); }
+  .toggle-icon {
+    width: 38px; height: 22px; background: var(--border);
+    border-radius: 11px; position: relative; transition: background 0.2s; flex-shrink: 0;
+  }
+  .toggle-icon::after {
+    content: ''; position: absolute; left: 3px; top: 3px;
+    width: 16px; height: 16px; background: white;
+    border-radius: 50%; transition: transform 0.2s;
+  }
+  .toggle-card.active .toggle-icon { background: var(--accent); }
+  .toggle-card.active .toggle-icon::after { transform: translateX(16px); }
+  .toggle-label { font-size: 13px; color: var(--text-muted); line-height: 1.4; }
+  .toggle-label strong { display: block; font-size: 14px; color: var(--text); font-weight: 600; margin-bottom: 1px; }
+
+  /* ── Text Fields ── */
+  .field-wrap { position: relative; margin-bottom: 16px; }
+  .field-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px; display: block;
+  }
+  .field-input-wrap {
+    display: flex; align-items: center;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); overflow: hidden; transition: border-color 0.15s;
+  }
+  .field-input-wrap:focus-within { border-color: var(--accent); }
+  .field-input-wrap input {
+    flex: 1; background: transparent; border: none; outline: none;
+    color: var(--text); font-family: 'DM Sans', sans-serif;
+    font-size: 15px; font-weight: 400; padding: 14px 16px; width: 100%;
+  }
+  .field-input-wrap input::placeholder { color: var(--text-dim); }
+  .field-clear {
+    background: transparent; border: none; padding: 0 14px;
+    color: var(--text-dim); font-size: 18px; cursor: pointer;
+    display: flex; align-items: center; transition: color 0.15s; flex-shrink: 0;
+  }
+  .field-clear:hover { color: var(--text-muted); }
+  .field-hint { font-size: 11px; color: var(--text-dim); margin-top: 5px; }
+  .field-hint.scanned { color: var(--success); display: flex; align-items: center; gap: 4px; }
+  .field-hint.scanned::before { content: '✓'; }
+  .amount-prefix {
+    padding: 14px 0 14px 16px; color: var(--text-muted);
+    font-size: 16px; font-weight: 600; flex-shrink: 0;
+  }
+
+  /* ── Calendar ── */
+  .calendar-wrap {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 16px;
+  }
+  .cal-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 14px 16px; border-bottom: 1px solid var(--border);
+  }
+  .cal-nav {
+    background: transparent; border: none; color: var(--text-muted);
+    font-size: 20px; cursor: pointer; padding: 4px 8px; border-radius: 6px;
+    transition: color 0.15s, background 0.15s;
+  }
+  .cal-nav:hover { color: var(--accent); background: rgba(200,169,110,0.1); }
+  .cal-month-year { font-family: 'DM Serif Display', serif; font-size: 16px; color: var(--text); }
+  .cal-grid { padding: 12px; }
+  .cal-days-header { display: grid; grid-template-columns: repeat(7,1fr); margin-bottom: 6px; }
+  .cal-day-label {
+    text-align: center; font-size: 10px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; color: var(--text-dim); padding: 4px 0;
+  }
+  .cal-cells { display: grid; grid-template-columns: repeat(7,1fr); gap: 2px; }
+  .cal-cell {
+    text-align: center; padding: 7px 4px; font-size: 13px;
+    border-radius: 6px; cursor: pointer; color: var(--text-muted);
+    transition: background 0.1s, color 0.1s;
+  }
+  .cal-cell:hover:not(.empty) { background: var(--surface2); color: var(--text); }
+  .cal-cell.today { color: var(--accent); font-weight: 600; }
+  .cal-cell.selected { background: var(--accent); color: #000; font-weight: 700; }
+  .cal-cell.empty { cursor: default; }
+
+  /* ── Category Grid ── */
+  .cat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .cat-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px; cursor: pointer;
+    transition: border-color 0.15s, background 0.15s;
+    font-size: 13px; font-weight: 500; color: var(--text-muted);
+    text-align: center; line-height: 1.3;
+  }
+  .cat-card:hover { border-color: var(--accent); color: var(--text); }
+  .cat-card.selected {
+    border-color: var(--accent); background: rgba(200,169,110,0.1);
+    color: var(--accent); font-weight: 600;
+  }
+
+  /* ── Summary ── */
+  .summary-card {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius); overflow: hidden; margin-bottom: 16px;
+  }
+  .summary-header {
+    background: linear-gradient(135deg, rgba(200,169,110,0.15), rgba(200,169,110,0.05));
+    border-bottom: 1px solid var(--border); padding: 16px 20px;
+    display: flex; align-items: center; justify-content: space-between;
+  }
+  .summary-amount { font-family: 'DM Serif Display', serif; font-size: 32px; color: var(--accent); }
+  .summary-date { font-size: 13px; color: var(--text-muted); }
+  .summary-rows { padding: 4px 0; }
+  .summary-row {
+    display: flex; align-items: center;
+    padding: 13px 20px; border-bottom: 1px solid var(--border); gap: 12px;
+  }
+  .summary-row:last-child { border-bottom: none; }
+  .summary-row-label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-dim); width: 90px; flex-shrink: 0;
+  }
+  .summary-row-val { font-size: 14px; font-weight: 500; color: var(--text); flex: 1; }
+  .summary-edit-btn {
+    background: transparent; border: none; color: var(--accent);
+    font-size: 11px; font-weight: 600; text-transform: uppercase;
+    letter-spacing: 0.08em; cursor: pointer; padding: 4px 8px; border-radius: 4px;
+  }
+
+  /* ── Buttons ── */
+  .btn-primary {
+    background: var(--accent); color: #000; border: none;
+    border-radius: var(--radius-sm); padding: 16px 24px;
+    font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700;
+    letter-spacing: 0.02em; cursor: pointer; width: 100%;
+    transition: background 0.15s, transform 0.1s; margin-top: auto;
+  }
+  .btn-primary:hover { background: var(--accent2); }
+  .btn-primary:active { transform: scale(0.98); }
+  .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-back {
+    background: transparent; border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 24px;
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+    color: var(--text-muted); cursor: pointer; width: 100%;
+    transition: border-color 0.15s, color 0.15s; margin-top: 10px;
+  }
+  .btn-back:hover { border-color: var(--text-muted); color: var(--text); }
+  .btn-danger {
+    background: transparent; border: 1.5px solid var(--danger-border);
+    border-radius: var(--radius-sm); padding: 13px 24px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600;
+    color: var(--danger); cursor: pointer; width: 100%;
+    transition: background 0.15s, border-color 0.15s; margin-top: 10px;
+  }
+  .btn-danger:hover { background: var(--danger-bg); border-color: var(--danger); }
+
+  /* ── States ── */
+  .loading-cats {
+    display: flex; align-items: center; gap: 12px;
+    padding: 20px; color: var(--text-muted); font-size: 14px;
+  }
+  .mini-spinner {
+    width: 18px; height: 18px;
+    border: 2px solid var(--border); border-top-color: var(--accent);
+    border-radius: 50%; animation: spin 0.8s linear infinite; flex-shrink: 0;
+  }
+  .error-msg {
+    background: rgba(224,90,78,0.1); border: 1px solid rgba(224,90,78,0.3);
+    border-radius: var(--radius-sm); padding: 12px 16px;
+    font-size: 13px; color: #e8857a; margin-bottom: 16px;
+  }
+  .success-msg {
+    background: rgba(90,184,130,0.1); border: 1px solid rgba(90,184,130,0.25);
+    border-radius: var(--radius-sm); padding: 12px 16px;
+    font-size: 13px; color: var(--success); margin-bottom: 16px;
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  /* ── Success Screen ── */
+  .success-icon {
+    width: 72px; height: 72px; background: rgba(90,184,130,0.15);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    margin: 0 auto 24px; font-size: 32px;
+  }
+  .success-title {
+    font-family: 'DM Serif Display', serif; font-size: 28px;
+    text-align: center; margin-bottom: 8px;
+  }
+  .success-sub { font-size: 14px; color: var(--text-muted); text-align: center; margin-bottom: 28px; line-height: 1.5; }
+  .success-detail {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 18px;
+    font-size: 13px; color: var(--text-muted); text-align: center;
+    margin-bottom: 20px; line-height: 1.6;
+  }
+  .success-detail strong { color: var(--accent); }
+
+  /* ════════════════════════════════════════════ */
+  /* ── SETTINGS PANEL (slide-in drawer) ── */
+  /* ════════════════════════════════════════════ */
+  .settings-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+    z-index: 100; opacity: 0; pointer-events: none;
+    transition: opacity 0.3s;
+  }
+  .settings-overlay.open { opacity: 1; pointer-events: all; }
+
+  .settings-drawer {
+    position: fixed; top: 0; right: 0; bottom: 0;
+    width: min(100vw, 480px);
+    background: var(--bg);
+    z-index: 101;
+    transform: translateX(100%);
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+    display: flex; flex-direction: column;
+    overflow: hidden;
+  }
+  .settings-drawer.open { transform: translateX(0); }
+
+  .settings-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 20px 20px 16px;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .settings-title {
+    font-family: 'DM Serif Display', serif; font-size: 22px; color: var(--text);
+  }
+  .settings-close {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: 8px; width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; color: var(--text-muted); font-size: 20px;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .settings-close:hover { border-color: var(--accent); color: var(--accent); }
+
+  .settings-body {
+    flex: 1; overflow-y: auto; padding: 20px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Section headers */
+  .sett-section {
+    margin-bottom: 28px;
+  }
+  .sett-section-header {
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 14px;
+  }
+  .sett-section-icon {
+    width: 30px; height: 30px;
+    background: rgba(200,169,110,0.12);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px; flex-shrink: 0;
+  }
+  .sett-section-title {
+    font-size: 14px; font-weight: 700; color: var(--text);
+  }
+  .sett-section-sub {
+    font-size: 11px; color: var(--text-muted); margin-top: 1px;
+  }
+
+  /* Tag list for cards/properties */
+  .tag-list {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; min-height: 32px;
+  }
+  .tag-item {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: 20px; padding: 5px 10px 5px 12px;
+    font-size: 13px; font-weight: 500; color: var(--text);
+    animation: tagIn 0.15s ease both;
+  }
+  @keyframes tagIn { from { opacity:0; transform:scale(0.85); } to { opacity:1; transform:scale(1); } }
+  .tag-remove {
+    background: transparent; border: none; cursor: pointer;
+    color: var(--text-dim); font-size: 16px; line-height: 1;
+    padding: 0 2px; transition: color 0.15s; display: flex; align-items: center;
+  }
+  .tag-remove:hover { color: var(--danger); }
+  .tag-empty { font-size: 12px; color: var(--text-dim); font-style: italic; padding: 6px 0; }
+
+  /* Add new item row */
+  .add-row {
+    display: flex; gap: 8px; align-items: center;
+  }
+  .add-input {
+    flex: 1; background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 14px;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .add-input:focus { border-color: var(--accent); }
+  .add-input::placeholder { color: var(--text-dim); }
+  .add-btn {
+    background: var(--accent); color: #000; border: none;
+    border-radius: var(--radius-sm); padding: 10px 16px;
+    font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 700;
+    cursor: pointer; white-space: nowrap; transition: background 0.15s;
+    flex-shrink: 0;
+  }
+  .add-btn:hover { background: var(--accent2); }
+  .add-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .sett-divider {
+    height: 1px; background: var(--border); margin: 24px 0;
+  }
+
+  /* Web App URL section in settings */
+  .url-row {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .url-input {
+    flex: 1; background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 14px;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 12px;
+    outline: none; transition: border-color 0.15s;
+  }
+  .url-input:focus { border-color: var(--accent); }
+  .url-save-btn {
+    background: var(--accent); color: #000; border: none;
+    border-radius: var(--radius-sm); padding: 10px 14px;
+    font-size: 12px; font-weight: 700; cursor: pointer;
+    white-space: nowrap; transition: background 0.15s; flex-shrink: 0;
+  }
+  .url-save-btn:hover { background: var(--accent2); }
+
+  .settings-footer {
+    padding: 16px 20px;
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  /* ── Config setup screen ── */
+  .config-field input {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 14px 16px;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+    width: 100%; outline: none; transition: border-color 0.15s; margin-top: 8px;
+  }
+  .config-field input:focus { border-color: var(--accent); }
+
+  /* ── Duplicate Warning Modal ── */
+  .modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.85);
+    z-index: 200; display: flex; align-items: flex-end; justify-content: center;
+    opacity: 0; pointer-events: none; transition: opacity 0.25s;
+  }
+  .modal-overlay.open { opacity: 1; pointer-events: all; }
+  .modal-sheet {
+    background: var(--surface);
+    border-radius: 20px 20px 0 0;
+    width: 100%; max-width: 480px;
+    padding: 24px 20px 40px;
+    transform: translateY(100%);
+    transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+    max-height: 85vh;
+    overflow-y: auto;
+  }
+  .modal-overlay.open .modal-sheet { transform: translateY(0); }
+  .modal-handle {
+    width: 36px; height: 4px; background: var(--border);
+    border-radius: 2px; margin: 0 auto 20px;
+  }
+  .modal-icon {
+    width: 52px; height: 52px;
+    background: rgba(224,90,78,0.12);
+    border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    font-size: 24px; margin: 0 auto 16px;
+  }
+  .modal-title {
+    font-family: 'DM Serif Display', serif;
+    font-size: 22px; text-align: center; margin-bottom: 8px;
+  }
+  .modal-sub {
+    font-size: 13px; color: var(--text-muted);
+    text-align: center; margin-bottom: 20px; line-height: 1.5;
+  }
+  .modal-warning-cards { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; }
+  .modal-warn-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 12px 14px;
+  }
+  .modal-warn-card.exact { border-color: rgba(224,90,78,0.4); background: rgba(224,90,78,0.06); }
+  .modal-warn-tag {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; margin-bottom: 6px;
+  }
+  .modal-warn-tag.exact { color: var(--danger); }
+  .modal-warn-tag.amount { color: var(--accent); }
+  .modal-warn-tag.file { color: #7eb8e8; }
+  .modal-warn-row {
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 12px; color: var(--text-muted); margin-bottom: 2px;
+  }
+  .modal-warn-row span:last-child { color: var(--text); font-weight: 500; }
+
+  .modal-filename-wrap {
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px; margin-bottom: 16px;
+  }
+  .modal-filename-label {
+    font-size: 10px; font-weight: 700; letter-spacing: 0.1em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+  }
+  .modal-filename-val {
+    font-size: 14px; font-weight: 600; color: var(--accent);
+    font-family: 'DM Serif Display', serif;
+  }
+  .modal-suffix-wrap {
+    margin-top: 10px;
+  }
+  .modal-suffix-label {
+    font-size: 11px; color: var(--text-muted); margin-bottom: 6px; display: block;
+  }
+  .modal-suffix-input {
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 10px 14px;
+    color: var(--text); font-family: 'DM Sans', sans-serif; font-size: 14px;
+    width: 100%; outline: none; transition: border-color 0.15s;
+  }
+  .modal-suffix-input:focus { border-color: var(--accent); }
+
+  .modal-actions { display: flex; flex-direction: column; gap: 10px; }
+  .btn-modal-submit {
+    background: var(--accent); color: #000; border: none;
+    border-radius: var(--radius-sm); padding: 15px 24px;
+    font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700;
+    cursor: pointer; width: 100%; transition: background 0.15s;
+  }
+  .btn-modal-submit:hover { background: var(--accent2); }
+  .btn-modal-discard {
+    background: transparent; border: 1.5px solid var(--danger-border);
+    border-radius: var(--radius-sm); padding: 13px 24px;
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+    color: var(--danger); cursor: pointer; width: 100%;
+    transition: background 0.15s, border-color 0.15s;
+  }
+  .btn-modal-discard:hover { background: var(--danger-bg); border-color: var(--danger); }
+  .btn-modal-back {
+    background: transparent; border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 13px 24px;
+    font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 600;
+    color: var(--text-muted); cursor: pointer; width: 100%;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .btn-modal-back:hover { border-color: var(--text-muted); color: var(--text); }
+
+  /* Drive filing status on success */
+  .drive-status {
+    display: flex; align-items: center; gap: 10px;
+    background: var(--surface2); border: 1px solid var(--border);
+    border-radius: var(--radius-sm); padding: 12px 14px; margin-top: 12px;
+    font-size: 12px; color: var(--text-muted); line-height: 1.4;
+  }
+  .drive-status-icon { font-size: 18px; flex-shrink: 0; }
+  .drive-status a { color: var(--accent); text-decoration: none; }
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- Top Bar -->
+  <div class="topbar">
+    <div class="topbar-logo">Expense Entry</div>
+    <div class="topbar-right">
+      <div class="topbar-step" id="stepLabel"></div>
+      <button class="settings-btn" id="settingsOpenBtn" onclick="openSettings()" title="Configure cards & properties" style="display:none">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
+    </div>
+  </div>
+  <div class="progress-wrap">
+    <div class="progress-track"><div class="progress-fill" id="progressFill" style="width:0%"></div></div>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- SCREEN 0: First-time Setup        -->
+  <!-- ══════════════════════════════════ -->
+  <div class="screen" id="screen-config">
+    <div class="screen-label">One-Time Setup</div>
+    <div class="screen-title">Connect to<br>Google Sheets</div>
+    <div class="screen-sub">Paste your Apps Script Web App URL. This is saved to your device — you'll only need to do this once.</div>
+    <div class="field-wrap config-field">
+      <label class="field-label">Apps Script Web App URL</label>
+      <input type="url" id="configUrl" placeholder="https://script.google.com/macros/s/…/exec" />
+      <div class="field-hint" style="margin-top:6px">You'll get this URL after deploying the Apps Script. See the Setup Guide.</div>
+    </div>
+    <div id="configUrlError" class="error-msg" style="display:none"></div>
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" onclick="saveConfig()">Save & Continue →</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ -->
+  <!-- SCREEN 1: Upload Receipt  -->
+  <!-- ══════════════════════════ -->
+  <div class="screen" id="screen-upload">
+    <div class="screen-label">Step 1 of 8</div>
+    <div class="screen-title">Upload Receipt</div>
+    <div class="screen-sub">Take a photo or upload a PDF. We'll scan it and auto-fill the fields.</div>
+
+    <div id="uploadZone" class="upload-zone" onclick="document.getElementById('fileInput').click()">
+      <div class="upload-icon">
+        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <div class="upload-title">Tap to upload</div>
+      <div class="upload-sub">Photo, screenshot, or PDF from Adobe Scan</div>
+      <input type="file" id="fileInput" accept="image/*,application/pdf" capture="environment" onchange="handleFile(event)" />
+    </div>
+
+    <div id="previewArea" style="display:none; margin-top:16px">
+      <div class="preview-wrap">
+        <img id="previewImg" src="" alt="Receipt preview" />
+        <button class="preview-remove" onclick="removeFile()">×</button>
+      </div>
+      <div id="scanStatus" class="scan-overlay" style="display:none">
+        <div class="scan-spinner"></div>
+        <div class="scan-text"><strong>Scanning Receipt</strong>Reading date, amount, vendor &amp; items…</div>
+      </div>
+    </div>
+
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" id="uploadNextBtn" onclick="goToScreen('business')" disabled>Continue</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ -->
+  <!-- SCREEN 2: Business        -->
+  <!-- ══════════════════════════ -->
+  <div class="screen" id="screen-business">
+    <div class="screen-label">Step 2 of 8</div>
+    <div class="screen-title">Which Business?</div>
+    <div class="screen-sub">Select the business this expense belongs to.</div>
+
+    <div class="checkbox-list" id="businessList">
+      <div class="checkbox-card" id="card-LNI" onclick="selectBusiness('LNI')">
+        <input type="radio" name="business" value="LNI" />
+        <div class="cb-box"><svg class="cb-check" width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div>
+          <div class="cb-label">LN Investments</div>
+          <div class="cb-sub" id="sub-LNI"></div>
+        </div>
+        <div id="badge-LNI" class="cb-badge" style="display:none">Suggested</div>
+      </div>
+      <div class="checkbox-card" id="card-LNEP" onclick="selectBusiness('LNEP')">
+        <input type="radio" name="business" value="LNEP" />
+        <div class="cb-box"><svg class="cb-check" width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+        <div>
+          <div class="cb-label">LNE Properties</div>
+          <div class="cb-sub" id="sub-LNEP"></div>
+        </div>
+        <div id="badge-LNEP" class="cb-badge" style="display:none">Suggested</div>
+      </div>
+    </div>
+
+    <div class="toggle-card" id="bizExpenseToggle" onclick="toggleBizExpense()">
+      <div class="toggle-icon"></div>
+      <div class="toggle-label">
+        <strong>Business-Level Expense</strong>
+        Not tied to a specific property — skips property selection
+      </div>
+    </div>
+
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" id="businessNextBtn" onclick="goToScreen('property')" disabled>Continue</button>
+      <button class="btn-back" onclick="goToScreen('upload')">← Back</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ -->
+  <!-- SCREEN 3: Property        -->
+  <!-- ══════════════════════════ -->
+  <div class="screen" id="screen-property">
+    <div class="screen-label">Step 3 of 8</div>
+    <div class="screen-title">Which Property?</div>
+    <div class="screen-sub">Select the property associated with this expense.</div>
+    <div class="checkbox-list" id="propertyList"></div>
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" id="propertyNextBtn" onclick="goToScreen('vendor')" disabled>Continue</button>
+      <button class="btn-back" onclick="goToScreen('business')">← Back</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ -->
+  <!-- SCREEN 4: Vendor          -->
+  <!-- ══════════════════════════ -->
+  <div class="screen" id="screen-vendor">
+    <div class="screen-label">Step 4 of 8</div>
+    <div class="screen-title">Place of Purchase</div>
+    <div class="screen-sub">Where was this purchase made? Edit if the scan wasn't quite right.</div>
+    <div class="field-wrap">
+      <label class="field-label">Vendor / Place of Purchase</label>
+      <div class="field-input-wrap">
+        <input type="text" id="vendorInput" placeholder="e.g. Home Depot, Google Pay…" oninput="checkVendorNext()" />
+        <button class="field-clear" onclick="clearField('vendorInput'); checkVendorNext()">×</button>
+      </div>
+      <div id="vendorHint" class="field-hint"></div>
+    </div>
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" id="vendorNextBtn" onclick="goToScreen('date')" disabled>Continue</button>
+      <button class="btn-back" onclick="goBackFromVendor()">← Back</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ -->
+  <!-- SCREEN 5: Date            -->
+  <!-- ══════════════════════════ -->
+  <div class="screen" id="screen-date">
+    <div class="screen-label">Step 5 of 8</div>
+    <div class="screen-title">Date of Purchase</div>
+    <div class="screen-sub">Confirm or select the correct date.</div>
+    <div class="field-wrap">
+      <label class="field-label">Selected Date</label>
+      <div class="field-input-wrap">
+        <input type="text" id="dateInput" placeholder="MM/DD/YYYY" readonly style="cursor:pointer" />
+        <button class="field-clear" onclick="clearDateField()">×</button>
+      </div>
+      <div id="dateHint" class="field-hint"></div>
+    </div>
+    <div class="calendar-wrap">
+      <div class="cal-header">
+        <button class="cal-nav" onclick="calNav(-1)">‹</button>
+        <div class="cal-month-year" id="calMonthYear"></div>
+        <button class="cal-nav" onclick="calNav(1)">›</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-days-header">
+          <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div>
+          <div class="cal-day-label">Tu</div><div class="cal-day-label">We</div>
+          <div class="cal-day-label">Th</div><div class="cal-day-label">Fr</div>
+          <div class="cal-day-label">Sa</div>
+        </div>
+        <div class="cal-cells" id="calCells"></div>
+      </div>
+    </div>
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" id="dateNextBtn" onclick="goToScreen('purpose')" disabled>Continue</button>
+      <button class="btn-back" onclick="goToScreen('vendor')">← Back</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ -->
+  <!-- SCREEN 6: Purpose         -->
+  <!-- ══════════════════════════ -->
+  <div class="screen" id="screen-purpose">
+    <div class="screen-label">Step 6 of 8</div>
+    <div class="screen-title">Purpose</div>
+    <div class="screen-sub">What is this expense for?</div>
+    <div id="purposeLoading" class="loading-cats" style="display:none">
+      <div class="mini-spinner"></div> Loading categories from your sheet…
+    </div>
+    <div id="purposeError" class="error-msg" style="display:none"></div>
+    <div class="cat-grid" id="purposeGrid"></div>
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" id="purposeNextBtn" onclick="goToScreen('amount')" disabled>Continue</button>
+      <button class="btn-back" onclick="goToScreen('date')">← Back</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ -->
+  <!-- SCREEN 7: Amount          -->
+  <!-- ══════════════════════════ -->
+  <div class="screen" id="screen-amount">
+    <div class="screen-label">Step 7 of 8</div>
+    <div class="screen-title">Amount</div>
+    <div class="screen-sub">Confirm or correct the total amount.</div>
+    <div class="field-wrap">
+      <label class="field-label">Total Amount</label>
+      <div class="field-input-wrap">
+        <span class="amount-prefix">$</span>
+        <input type="number" id="amountInput" placeholder="0.00" step="0.01" min="0" oninput="checkAmountNext()" />
+        <button class="field-clear" onclick="clearField('amountInput'); checkAmountNext()">×</button>
+      </div>
+      <div id="amountHint" class="field-hint"></div>
+    </div>
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" id="amountNextBtn" onclick="goToScreen('description')" disabled>Continue</button>
+      <button class="btn-back" onclick="goToScreen('purpose')">← Back</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ -->
+  <!-- SCREEN 8: Description     -->
+  <!-- ══════════════════════════ -->
+  <div class="screen" id="screen-description">
+    <div class="screen-label">Step 8 of 8</div>
+    <div class="screen-title">Description</div>
+    <div class="screen-sub">Brief note — max 20 characters.</div>
+    <div class="field-wrap">
+      <label class="field-label">Description <span id="descCount" style="color:var(--text-dim);font-weight:400">0/20</span></label>
+      <div class="field-input-wrap">
+        <input type="text" id="descInput" placeholder="e.g. March Rent" maxlength="20" oninput="updateDescCount()" />
+        <button class="field-clear" onclick="clearField('descInput'); updateDescCount()">×</button>
+      </div>
+      <div id="descHint" class="field-hint"></div>
+    </div>
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" onclick="goToScreen('summary')">Review Summary</button>
+      <button class="btn-back" onclick="goToScreen('amount')">← Back</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ -->
+  <!-- SCREEN 9: Summary         -->
+  <!-- ══════════════════════════ -->
+  <div class="screen" id="screen-summary">
+    <div class="screen-label">Review</div>
+    <div class="screen-title">Confirm Entry</div>
+    <div class="screen-sub">Everything look right? Tap Submit to add to your sheet.</div>
+    <div class="summary-card">
+      <div class="summary-header">
+        <div>
+          <div style="font-size:12px;color:var(--text-muted);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.08em">Total Amount</div>
+          <div class="summary-amount" id="sumAmount">$0.00</div>
+        </div>
+        <div class="summary-date" id="sumDate"></div>
+      </div>
+      <div class="summary-rows">
+        <div class="summary-row"><div class="summary-row-label">Business</div><div class="summary-row-val" id="sumBusiness">—</div><button class="summary-edit-btn" onclick="goToScreen('business')">Edit</button></div>
+        <div class="summary-row"><div class="summary-row-label">Property</div><div class="summary-row-val" id="sumProperty">—</div><button class="summary-edit-btn" onclick="editProperty()">Edit</button></div>
+        <div class="summary-row"><div class="summary-row-label">Vendor</div><div class="summary-row-val" id="sumVendor">—</div><button class="summary-edit-btn" onclick="goToScreen('vendor')">Edit</button></div>
+        <div class="summary-row"><div class="summary-row-label">Purpose</div><div class="summary-row-val" id="sumPurpose">—</div><button class="summary-edit-btn" onclick="goToScreen('purpose')">Edit</button></div>
+        <div class="summary-row"><div class="summary-row-label">Description</div><div class="summary-row-val" id="sumDesc">—</div><button class="summary-edit-btn" onclick="goToScreen('description')">Edit</button></div>
+        <div class="summary-row" style="border:none"><div class="summary-row-label">Sheet Tab</div><div class="summary-row-val" id="sumTab" style="font-size:12px;color:var(--text-muted)">—</div></div>
+      </div>
+    </div>
+    <div id="submitError" class="error-msg" style="display:none"></div>
+    <div style="margin-top:auto; padding-top:10px">
+      <button class="btn-primary" id="submitBtn" onclick="submitEntry()">Submit to Google Sheets</button>
+      <button class="btn-back" onclick="goToScreen('description')">← Back</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════ -->
+  <!-- SCREEN 10: Success        -->
+  <!-- ══════════════════════════ -->
+  <div class="screen" id="screen-success">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;padding-top:40px">
+      <div class="success-icon">✓</div>
+      <div class="success-title">Entry Added!</div>
+      <div class="success-sub">Your expense has been recorded in Google Sheets.</div>
+      <div class="success-detail" id="successDetail"></div>
+      <div class="drive-status" id="driveStatus" style="display:none; margin-top:0; text-align:left">
+        <div class="drive-status-icon">📁</div>
+        <div id="driveStatusText" style="font-size:12px; line-height:1.5"></div>
+      </div>
+    </div>
+    <button class="btn-primary" onclick="resetApp()" style="margin-top:auto">Add Another Expense</button>
+  </div>
+
+</div><!-- /#app -->
+
+
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- SETTINGS DRAWER                                           -->
+<!-- ══════════════════════════════════════════════════════════ -->
+<!-- DUPLICATE WARNING MODAL -->
+<div class="modal-overlay" id="dupModal">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-icon">⚠️</div>
+    <div class="modal-title">Possible Duplicate</div>
+    <div class="modal-sub" id="dupModalSub">We found entries that may match this receipt.</div>
+    <div class="modal-warning-cards" id="dupModalCards"></div>
+    <div class="modal-filename-wrap">
+      <div class="modal-filename-label">Receipt filename</div>
+      <div class="modal-filename-val" id="dupModalFilename">—</div>
+      <div class="modal-suffix-wrap" id="dupSuffixWrap" style="display:none">
+        <label class="modal-suffix-label">Add a suffix to make the filename unique (e.g. 2, B):</label>
+        <input class="modal-suffix-input" type="text" id="dupSuffixInput" placeholder="e.g. 2" maxlength="10" oninput="updateSuffixPreview()" />
+        <div style="font-size:11px;color:var(--text-dim);margin-top:5px">Preview: <span id="dupSuffixPreview" style="color:var(--accent)"></span></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-modal-submit" onclick="submitWithDuplicateDecision('submit')">Submit Anyway</button>
+      <button class="btn-modal-submit" id="dupSubmitSuffixBtn" onclick="submitWithDuplicateDecision('suffix')" style="background:var(--surface2);color:var(--text);border:1.5px solid var(--border);display:none">Add Suffix &amp; Submit</button>
+      <button class="btn-modal-back" onclick="closeDupModal()">← Go Back &amp; Edit</button>
+      <button class="btn-modal-discard" onclick="submitWithDuplicateDecision('discard')">Discard This Entry</button>
+    </div>
+  </div>
+</div>
+
+<div class="settings-overlay" id="settingsOverlay" onclick="closeSettings()"></div>
+<div class="settings-drawer" id="settingsDrawer">
+
+  <div class="settings-header">
+    <div class="settings-title">Configure</div>
+    <button class="settings-close" onclick="closeSettings()">×</button>
+  </div>
+
+  <div class="settings-body">
+
+    <!-- ── LN Investments Cards ── -->
+    <div class="sett-section">
+      <div class="sett-section-header">
+        <div class="sett-section-icon">💳</div>
+        <div>
+          <div class="sett-section-title">LN Investments — Card Numbers</div>
+          <div class="sett-section-sub">Last 4 digits that suggest this business</div>
+        </div>
+      </div>
+      <div class="tag-list" id="tags-LNI-cards"></div>
+      <div class="add-row">
+        <input class="add-input" type="text" id="add-LNI-cards" placeholder="Last 4 digits (e.g. 6247)" maxlength="4" pattern="\d{4}" inputmode="numeric" onkeydown="if(event.key==='Enter') addTag('LNI','cards')" />
+        <button class="add-btn" onclick="addTag('LNI','cards')">Add</button>
+      </div>
+    </div>
+
+    <!-- ── LNE Properties Cards ── -->
+    <div class="sett-section">
+      <div class="sett-section-header">
+        <div class="sett-section-icon">💳</div>
+        <div>
+          <div class="sett-section-title">LNE Properties — Card Numbers</div>
+          <div class="sett-section-sub">Last 4 digits that suggest this business</div>
+        </div>
+      </div>
+      <div class="tag-list" id="tags-LNEP-cards"></div>
+      <div class="add-row">
+        <input class="add-input" type="text" id="add-LNEP-cards" placeholder="Last 4 digits (e.g. 3323)" maxlength="4" pattern="\d{4}" inputmode="numeric" onkeydown="if(event.key==='Enter') addTag('LNEP','cards')" />
+        <button class="add-btn" onclick="addTag('LNEP','cards')">Add</button>
+      </div>
+    </div>
+
+    <div class="sett-divider"></div>
+
+    <!-- ── LN Investments Properties ── -->
+    <div class="sett-section">
+      <div class="sett-section-header">
+        <div class="sett-section-icon">🏠</div>
+        <div>
+          <div class="sett-section-title">LN Investments — Properties</div>
+          <div class="sett-section-sub">Properties shown when LNI is selected</div>
+        </div>
+      </div>
+      <div class="tag-list" id="tags-LNI-props"></div>
+      <div class="add-row">
+        <input class="add-input" type="text" id="add-LNI-props" placeholder="Property name (e.g. Cornerstone)" onkeydown="if(event.key==='Enter') addTag('LNI','props')" />
+        <button class="add-btn" onclick="addTag('LNI','props')">Add</button>
+      </div>
+    </div>
+
+    <!-- ── LNE Properties Properties ── -->
+    <div class="sett-section">
+      <div class="sett-section-header">
+        <div class="sett-section-icon">🏠</div>
+        <div>
+          <div class="sett-section-title">LNE Properties — Properties</div>
+          <div class="sett-section-sub">Properties shown when LNEP is selected</div>
+        </div>
+      </div>
+      <div class="tag-list" id="tags-LNEP-props"></div>
+      <div class="add-row">
+        <input class="add-input" type="text" id="add-LNEP-props" placeholder="Property name (e.g. Parkridge)" onkeydown="if(event.key==='Enter') addTag('LNEP','props')" />
+        <button class="add-btn" onclick="addTag('LNEP','props')">Add</button>
+      </div>
+    </div>
+
+    <div class="sett-divider"></div>
+
+    <!-- ── Web App URL ── -->
+    <div class="sett-section">
+      <div class="sett-section-header">
+        <div class="sett-section-icon">🔗</div>
+        <div>
+          <div class="sett-section-title">Apps Script URL</div>
+          <div class="sett-section-sub">Google Sheets connection</div>
+        </div>
+      </div>
+      <div id="settUrlSuccess" class="success-msg" style="display:none">✓ URL saved successfully</div>
+      <div class="url-row">
+        <input class="url-input" type="url" id="settWebAppUrl" placeholder="https://script.google.com/macros/s/…/exec" />
+        <button class="url-save-btn" onclick="saveUrlFromSettings()">Save</button>
+      </div>
+    </div>
+
+    <div class="sett-divider"></div>
+
+    <!-- ── Property Abbreviations ── -->
+    <div class="sett-section">
+      <div class="sett-section-header">
+        <div class="sett-section-icon">🏷️</div>
+        <div>
+          <div class="sett-section-title">Property Abbreviations</div>
+          <div class="sett-section-sub">Override auto-generated filename prefixes</div>
+        </div>
+      </div>
+      <div id="propAbbrList" style="margin-bottom:10px"></div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;line-height:1.5">
+        Auto-generated from initials (e.g. Beau Darren → BD). Add an override here if you want a different abbreviation.
+      </div>
+      <div class="add-row" style="gap:6px">
+        <input class="add-input" type="text" id="abbrPropName" placeholder="Property name" style="flex:2" />
+        <input class="add-input" type="text" id="abbrPropVal" placeholder="Abbr" maxlength="6" style="flex:1;text-transform:uppercase" />
+        <button class="add-btn" onclick="addPropAbbr()">Set</button>
+      </div>
+    </div>
+
+    <div class="sett-divider"></div>
+
+    <!-- ── Reset to Defaults ── -->
+    <div class="sett-section">
+      <div class="sett-section-header">
+        <div class="sett-section-icon">↺</div>
+        <div>
+          <div class="sett-section-title">Reset to Defaults</div>
+          <div class="sett-section-sub">Restore original card numbers and properties</div>
+        </div>
+      </div>
+      <button class="btn-danger" onclick="confirmReset()">Reset Cards &amp; Properties to Defaults</button>
+    </div>
+
+  </div><!-- /.settings-body -->
+
+  <div class="settings-footer">
+    <button class="btn-primary" onclick="closeSettings()" style="margin-top:0">Done</button>
+  </div>
+
+</div><!-- /.settings-drawer -->
+
+
+<script>
+// ════════════════════════════════════════════
+// DEFAULTS
+// ════════════════════════════════════════════
+const DEFAULTS = {
+  LNI: {
+    cards: ['6247','1334','1326','6254'],
+    props: ['Beau Darren','Briarhurst','Cornerstone','Letitia']
+  },
+  LNEP: {
+    cards: ['3323','4134','4126','3331'],
+    props: ['Rue De Belle Maison','Parkridge']
+  }
+};
+
+const BUSINESS_NAMES = { LNI: 'LN Investments', LNEP: 'LNE Properties' };
+
+// ════════════════════════════════════════════
+// STORAGE HELPERS — load/save config
+// ════════════════════════════════════════════
+function loadConfig() {
+  try {
+    const raw = localStorage.getItem('expenseConfig');
+    if (raw) return JSON.parse(raw);
+  } catch(e) {}
+  return null;
+}
+
+function saveConfigToStorage(cfg) {
+  localStorage.setItem('expenseConfig', JSON.stringify(cfg));
+}
+
+function getConfig() {
+  const stored = loadConfig();
+  if (stored) return stored;
+  // First time — use defaults
+  return {
+    webAppUrl: localStorage.getItem('webAppUrl') || '',
+    LNI: { cards: [...DEFAULTS.LNI.cards], props: [...DEFAULTS.LNI.props] },
+    LNEP: { cards: [...DEFAULTS.LNEP.cards], props: [...DEFAULTS.LNEP.props] }
+  };
+}
+
+// Live config — always current
+let CFG = getConfig();
+
+function persistCFG() {
+  saveConfigToStorage(CFG);
+}
+
+// ════════════════════════════════════════════
+// APP STATE
+// ════════════════════════════════════════════
+const STATE = {
+  fileBase64: null,
+  fileMimeType: null,
+  scanned: {},
+  business: null,
+  isBusinessExpense: false,
+  property: null,
+  vendor: '',
+  date: null,
+  purpose: null,
+  amount: null,
+  description: '',
+  calYear: new Date().getFullYear(),
+  calMonth: new Date().getMonth(),
+};
+
+// ════════════════════════════════════════════
+// SETTINGS PANEL
+// ════════════════════════════════════════════
+function openSettings() {
+  // Populate fields from CFG
+  renderTagList('LNI', 'cards');
+  renderTagList('LNEP', 'cards');
+  renderTagList('LNI', 'props');
+  renderTagList('LNEP', 'props');
+  renderPropAbbrList();
+
+  const urlEl = document.getElementById('settWebAppUrl');
+  if (urlEl) urlEl.value = CFG.webAppUrl || '';
+
+  document.getElementById('settUrlSuccess').style.display = 'none';
+  document.getElementById('settingsOverlay').classList.add('open');
+  document.getElementById('settingsDrawer').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settingsOverlay').classList.remove('open');
+  document.getElementById('settingsDrawer').classList.remove('open');
+  // Refresh business card subtitles live
+  updateBusinessSubtitles();
+}
+
+function renderTagList(biz, type) {
+  const containerId = `tags-${biz}-${type === 'cards' ? 'cards' : 'props'}`;
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const items = CFG[biz][type === 'cards' ? 'cards' : 'props'];
+  container.innerHTML = '';
+
+  if (!items.length) {
+    container.innerHTML = `<span class="tag-empty">No ${type === 'cards' ? 'card numbers' : 'properties'} added yet</span>`;
+    return;
+  }
+
+  items.forEach((item, i) => {
+    const tag = document.createElement('div');
+    tag.className = 'tag-item';
+    tag.innerHTML = `<span>${item}</span><button class="tag-remove" onclick="removeTag('${biz}','${type === 'cards' ? 'cards' : 'props'}',${i})" title="Remove">×</button>`;
+    container.appendChild(tag);
+  });
+}
+
+function addTag(biz, type) {
+  const key = type === 'cards' ? 'cards' : 'props';
+  const inputId = `add-${biz}-${type === 'cards' ? 'cards' : 'props'}`;
+  const input = document.getElementById(inputId);
+  const val = input.value.trim();
+
+  if (!val) return;
+
+  // Validate card numbers (4 digits only)
+  if (type === 'cards' && !/^\d{4}$/.test(val)) {
+    input.style.borderColor = 'var(--danger)';
+    setTimeout(() => input.style.borderColor = '', 1500);
+    return;
+  }
+
+  // Prevent duplicates
+  if (CFG[biz][key].includes(val)) {
+    input.style.borderColor = 'var(--accent)';
+    setTimeout(() => input.style.borderColor = '', 1500);
+    input.value = '';
+    return;
+  }
+
+  CFG[biz][key].push(val);
+  persistCFG();
+  input.value = '';
+  renderTagList(biz, type);
+
+  // If property list for current business is open, rebuild it
+  if (type === 'props' && STATE.business === biz) {
+    buildPropertyList();
+  }
+}
+
+function removeTag(biz, key, index) {
+  CFG[biz][key].splice(index, 1);
+  persistCFG();
+  renderTagList(biz, key === 'cards' ? 'cards' : 'props');
+
+  // Live update property list if relevant
+  if (key === 'props' && STATE.business === biz) {
+    buildPropertyList();
+    // If removed property was selected, clear it
+    if (STATE.property && !CFG[biz].props.includes(STATE.property)) {
+      STATE.property = null;
+    }
+  }
+}
+
+function saveUrlFromSettings() {
+  const url = document.getElementById('settWebAppUrl').value.trim();
+  if (url && url.startsWith('https://script.google.com')) {
+    CFG.webAppUrl = url;
+    persistCFG();
+    document.getElementById('settUrlSuccess').style.display = 'flex';
+    setTimeout(() => document.getElementById('settUrlSuccess').style.display = 'none', 2500);
+  }
+}
+
+function addPropAbbr() {
+  const propName = document.getElementById('abbrPropName').value.trim();
+  const abbr = document.getElementById('abbrPropVal').value.trim().toUpperCase();
+  if (!propName || !abbr) return;
+  if (!CFG.propertyAbbreviations) CFG.propertyAbbreviations = {};
+  CFG.propertyAbbreviations[propName] = abbr;
+  persistCFG();
+  document.getElementById('abbrPropName').value = '';
+  document.getElementById('abbrPropVal').value = '';
+  renderPropAbbrList();
+}
+
+function removePropAbbr(propName) {
+  if (CFG.propertyAbbreviations) {
+    delete CFG.propertyAbbreviations[propName];
+    persistCFG();
+    renderPropAbbrList();
+  }
+}
+
+function renderPropAbbrList() {
+  const container = document.getElementById('propAbbrList');
+  if (!container) return;
+  const overrides = CFG.propertyAbbreviations || {};
+  const entries = Object.entries(overrides);
+  if (!entries.length) {
+    container.innerHTML = '<div class="tag-empty">No overrides set — using auto-generated initials</div>';
+    return;
+  }
+  container.innerHTML = '';
+  entries.forEach(([prop, abbr]) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;';
+    row.innerHTML = `
+      <span style="color:var(--text-muted)">${prop}</span>
+      <span style="display:flex;align-items:center;gap:10px">
+        <span style="color:var(--accent);font-weight:700">${abbr}</span>
+        <button class="tag-remove" onclick="removePropAbbr('${prop.replace(/'/g,"\\'")}')">×</button>
+      </span>`;
+    container.appendChild(row);
+  });
+}
+
+function confirmReset() {
+  if (confirm('Reset all card numbers and properties back to the original defaults? Your Apps Script URL will not change.')) {
+    CFG.LNI = { cards: [...DEFAULTS.LNI.cards], props: [...DEFAULTS.LNI.props] };
+    CFG.LNEP = { cards: [...DEFAULTS.LNEP.cards], props: [...DEFAULTS.LNEP.props] };
+    persistCFG();
+    renderTagList('LNI', 'cards');
+    renderTagList('LNEP', 'cards');
+    renderTagList('LNI', 'props');
+    renderTagList('LNEP', 'props');
+    updateBusinessSubtitles();
+  }
+}
+
+function updateBusinessSubtitles() {
+  const lniSub = document.getElementById('sub-LNI');
+  const lnepSub = document.getElementById('sub-LNEP');
+  if (lniSub) lniSub.textContent = 'Cards ending in ' + (CFG.LNI.cards.join(', ') || 'none set');
+  if (lnepSub) lnepSub.textContent = 'Cards ending in ' + (CFG.LNEP.cards.join(', ') || 'none set');
+}
+
+// ════════════════════════════════════════════
+// SETUP / CONFIG SCREEN
+// ════════════════════════════════════════════
+function saveConfig() {
+  const url = document.getElementById('configUrl').value.trim();
+  const err = document.getElementById('configUrlError');
+  if (!url.startsWith('https://script.google.com')) {
+    err.textContent = 'Please enter a valid Apps Script Web App URL.';
+    err.style.display = 'block';
+    return;
+  }
+  err.style.display = 'none';
+  CFG.webAppUrl = url;
+  persistCFG();
+  document.getElementById('settingsOpenBtn').style.display = 'flex';
+  goToScreen('upload');
+}
+
+// ════════════════════════════════════════════
+// NAVIGATION
+// ════════════════════════════════════════════
+let currentScreen = '';
+
+function goToScreen(name) {
+  if (name === 'property' && STATE.isBusinessExpense) name = 'vendor';
+  if (name === 'vendor') setTimeout(prefillVendor, 50);
+  if (name === 'date') setTimeout(() => { prefillDate(); renderCalendar(); }, 50);
+  if (name === 'amount') setTimeout(prefillAmount, 50);
+  if (name === 'description') setTimeout(prefillDescription, 50);
+  if (name === 'business') { updateBusinessSubtitles(); setTimeout(suggestBusiness, 100); }
+  if (name === 'property') buildPropertyList();
+  if (name === 'purpose') loadCategories();
+  if (name === 'summary') buildSummary();
+
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  const el = document.getElementById('screen-' + name);
+  if (el) el.classList.add('active');
+  currentScreen = name;
+  updateProgress(name);
+  window.scrollTo(0, 0);
+}
+
+function updateProgress(name) {
+  const map = { upload:1, business:2, property:3, vendor:4, date:5, purpose:6, amount:7, description:8, summary:8, success:9 };
+  const step = map[name] || 1;
+  document.getElementById('progressFill').style.width = ((step / 9) * 100) + '%';
+  const label = document.getElementById('stepLabel');
+  label.textContent = (name === 'success' || name === 'summary' || name === 'config') ? '' : `${step} / 8`;
+}
+
+function goBackFromVendor() {
+  goToScreen(STATE.isBusinessExpense ? 'business' : 'property');
+}
+
+function editProperty() {
+  goToScreen(STATE.isBusinessExpense ? 'business' : 'property');
+}
+
+// ════════════════════════════════════════════
+// FILE UPLOAD & SCAN
+// ════════════════════════════════════════════
+function handleFile(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  STATE.fileMimeType = file.type;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const dataUrl = e.target.result;
+    STATE.fileBase64 = dataUrl.split(',')[1];
+    const preview = document.getElementById('previewArea');
+    const img = document.getElementById('previewImg');
+    preview.style.display = 'block';
+    if (file.type === 'application/pdf') {
+      img.src = 'data:image/svg+xml,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="300" height="200" viewBox="0 0 300 200"><rect width="300" height="200" fill="#1a1a1a"/><text x="150" y="90" text-anchor="middle" fill="#c8a96e" font-size="40">📄</text><text x="150" y="130" text-anchor="middle" fill="#888" font-size="14">PDF Receipt</text><text x="150" y="155" text-anchor="middle" fill="#555" font-size="12">${file.name}</text></svg>`);
+    } else {
+      img.src = dataUrl;
+    }
+    document.getElementById('uploadZone').style.display = 'none';
+    if (CFG.webAppUrl) {
+      scanReceiptWithVision();
+    } else {
+      document.getElementById('uploadNextBtn').disabled = false;
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeFile() {
+  STATE.fileBase64 = null; STATE.fileMimeType = null; STATE.scanned = {};
+  document.getElementById('previewArea').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'flex';
+  document.getElementById('uploadNextBtn').disabled = true;
+  document.getElementById('fileInput').value = '';
+}
+
+async function scanReceiptWithVision() {
+  const scanStatus = document.getElementById('scanStatus');
+  const nextBtn = document.getElementById('uploadNextBtn');
+  scanStatus.style.display = 'flex';
+  nextBtn.disabled = true;
+  try {
+    const response = await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'scanReceipt', imageBase64: STATE.fileBase64, mimeType: STATE.fileMimeType })
+    });
+    const data = await response.json();
+    if (data.text) parseReceiptText(data.text);
+  } catch (err) {
+    console.warn('Scan failed, continuing manually:', err);
+  }
+  scanStatus.style.display = 'none';
+  nextBtn.disabled = false;
+}
+
+function parseReceiptText(text) {
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+  const fullText = text;
+  const datePatterns = [
+    /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/,
+    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/i,
+    /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/
+  ];
+  for (const p of datePatterns) {
+    const m = fullText.match(p);
+    if (m) { try { const d = new Date(m[0]); if (!isNaN(d)) { STATE.scanned.date = d; break; } } catch {} }
+  }
+  const amountMatches = [...fullText.matchAll(/\$?\s?(\d{1,4}[,.]?\d{0,3}\.\d{2})/g)];
+  if (amountMatches.length) {
+    const amounts = amountMatches.map(m => parseFloat(m[1].replace(',', '')));
+    STATE.scanned.amount = Math.max(...amounts);
+  }
+  const skipWords = /receipt|invoice|total|tax|date|amount|thank|welcome|store|purchase/i;
+  for (const line of lines.slice(0, 8)) {
+    if (line.length > 3 && line.length < 40 && !skipWords.test(line) && !/^\d/.test(line) && !/^\$/.test(line)) {
+      STATE.scanned.vendor = line; break;
+    }
+  }
+  const cardMatch = fullText.match(/(?:card|visa|mc|mastercard|amex|ending|xxxx)[^\d]*(\d{4})/i);
+  if (cardMatch) STATE.scanned.cardLast4 = cardMatch[1];
+  const itemLines = lines.filter(l => l.length > 3 && l.length < 30 && !/\$/.test(l) && !/\d{1,2}\/\d{1,2}/.test(l)).slice(2, 6);
+  if (itemLines.length) STATE.scanned.description = itemLines[0].substring(0, 20);
+}
+
+// ════════════════════════════════════════════
+// BUSINESS SCREEN
+// ════════════════════════════════════════════
+function selectBusiness(biz) {
+  STATE.business = biz;
+  document.querySelectorAll('.checkbox-card[id^="card-"]').forEach(c => c.classList.remove('selected'));
+  document.getElementById('card-' + biz).classList.add('selected');
+  document.getElementById('businessNextBtn').disabled = false;
+}
+
+function toggleBizExpense() {
+  STATE.isBusinessExpense = !STATE.isBusinessExpense;
+  document.getElementById('bizExpenseToggle').classList.toggle('active', STATE.isBusinessExpense);
+}
+
+function suggestBusiness() {
+  const last4 = STATE.scanned.cardLast4;
+  if (!last4) return;
+  for (const biz of ['LNI', 'LNEP']) {
+    if (CFG[biz].cards.includes(last4)) {
+      selectBusiness(biz);
+      document.getElementById('badge-' + biz).style.display = 'flex';
+      break;
+    }
+  }
+}
+
+// ════════════════════════════════════════════
+// PROPERTY SCREEN — reads live from CFG
+// ════════════════════════════════════════════
+function buildPropertyList() {
+  const list = document.getElementById('propertyList');
+  list.innerHTML = '';
+  const props = CFG[STATE.business] ? CFG[STATE.business].props : [];
+  if (!props.length) {
+    list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:16px 0">No properties configured. Open Settings ⚙ to add some.</div>';
+    return;
+  }
+  props.forEach(p => {
+    const card = document.createElement('div');
+    card.className = 'checkbox-card' + (STATE.property === p ? ' selected' : '');
+    card.innerHTML = `<div class="cb-box"><svg class="cb-check" width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="cb-label">${p}</div>`;
+    card.onclick = () => {
+      STATE.property = p;
+      document.querySelectorAll('#propertyList .checkbox-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      document.getElementById('propertyNextBtn').disabled = false;
+    };
+    list.appendChild(card);
+  });
+}
+
+// ════════════════════════════════════════════
+// VENDOR
+// ════════════════════════════════════════════
+function prefillVendor() {
+  const input = document.getElementById('vendorInput');
+  const hint = document.getElementById('vendorHint');
+  if (STATE.scanned.vendor && !input.value) {
+    input.value = STATE.scanned.vendor;
+    hint.textContent = 'Auto-filled from receipt scan';
+    hint.className = 'field-hint scanned';
+  }
+  STATE.vendor = input.value;
+  checkVendorNext();
+}
+
+function checkVendorNext() {
+  STATE.vendor = document.getElementById('vendorInput').value.trim();
+  document.getElementById('vendorNextBtn').disabled = STATE.vendor.length === 0;
+}
+
+// ════════════════════════════════════════════
+// DATE
+// ════════════════════════════════════════════
+function prefillDate() {
+  const hint = document.getElementById('dateHint');
+  if (STATE.scanned.date && !STATE.date) {
+    selectDate(STATE.scanned.date);
+    hint.textContent = 'Auto-filled from receipt scan';
+    hint.className = 'field-hint scanned';
+  } else {
+    renderCalendar();
+  }
+}
+
+function selectDate(d) {
+  STATE.date = d;
+  STATE.calYear = d.getFullYear();
+  STATE.calMonth = d.getMonth();
+  document.getElementById('dateInput').value = `${d.getMonth()+1}/${d.getDate()}/${d.getFullYear()}`;
+  document.getElementById('dateNextBtn').disabled = false;
+  renderCalendar();
+}
+
+function clearDateField() {
+  STATE.date = null;
+  document.getElementById('dateInput').value = '';
+  document.getElementById('dateNextBtn').disabled = true;
+  document.getElementById('dateHint').textContent = '';
+  document.getElementById('dateHint').className = 'field-hint';
+}
+
+function calNav(dir) {
+  STATE.calMonth += dir;
+  if (STATE.calMonth > 11) { STATE.calMonth = 0; STATE.calYear++; }
+  if (STATE.calMonth < 0) { STATE.calMonth = 11; STATE.calYear--; }
+  renderCalendar();
+}
+
+function renderCalendar() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('calMonthYear').textContent = `${months[STATE.calMonth]} ${STATE.calYear}`;
+  const cells = document.getElementById('calCells');
+  cells.innerHTML = '';
+  const firstDay = new Date(STATE.calYear, STATE.calMonth, 1).getDay();
+  const daysInMonth = new Date(STATE.calYear, STATE.calMonth + 1, 0).getDate();
+  const today = new Date();
+  for (let i = 0; i < firstDay; i++) { const el = document.createElement('div'); el.className = 'cal-cell empty'; cells.appendChild(el); }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const el = document.createElement('div');
+    el.className = 'cal-cell';
+    el.textContent = d;
+    const cellDate = new Date(STATE.calYear, STATE.calMonth, d);
+    if (today.toDateString() === cellDate.toDateString()) el.classList.add('today');
+    if (STATE.date && STATE.date.toDateString() === cellDate.toDateString()) el.classList.add('selected');
+    el.onclick = () => selectDate(new Date(STATE.calYear, STATE.calMonth, d));
+    cells.appendChild(el);
+  }
+}
+
+// ════════════════════════════════════════════
+// PURPOSE
+// ════════════════════════════════════════════
+async function loadCategories() {
+  const grid = document.getElementById('purposeGrid');
+  const loading = document.getElementById('purposeLoading');
+  const errEl = document.getElementById('purposeError');
+  if (!STATE.business) return;
+  if (grid.dataset.loadedFor === STATE.business) return;
+  grid.innerHTML = '';
+  grid.dataset.loadedFor = '';
+  loading.style.display = 'flex';
+  errEl.style.display = 'none';
+  const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
+  try {
+    const resp = await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'getCategories', business: STATE.business, year })
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    loading.style.display = 'none';
+    grid.dataset.loadedFor = STATE.business;
+    buildCategoryGrid(data.categories);
+  } catch (err) {
+    loading.style.display = 'none';
+    errEl.textContent = `Could not load categories: ${err.message}`;
+    errEl.style.display = 'block';
+    buildCategoryGrid(['Rent','Repair','Supplies','Auto','Legal','Meals','HOA','Insurance','Management fees','Taxes','Advertising','Commissions','Cleaning']);
+  }
+}
+
+function buildCategoryGrid(cats) {
+  const grid = document.getElementById('purposeGrid');
+  grid.innerHTML = '';
+  cats.forEach(cat => {
+    const card = document.createElement('div');
+    card.className = 'cat-card' + (STATE.purpose === cat ? ' selected' : '');
+    card.textContent = cat;
+    card.onclick = () => {
+      STATE.purpose = cat;
+      document.querySelectorAll('.cat-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      document.getElementById('purposeNextBtn').disabled = false;
+    };
+    grid.appendChild(card);
+  });
+}
+
+// ════════════════════════════════════════════
+// AMOUNT & DESCRIPTION
+// ════════════════════════════════════════════
+function prefillAmount() {
+  const input = document.getElementById('amountInput');
+  const hint = document.getElementById('amountHint');
+  if (STATE.scanned.amount && !input.value) {
+    input.value = STATE.scanned.amount.toFixed(2);
+    hint.textContent = 'Auto-filled from receipt scan';
+    hint.className = 'field-hint scanned';
+  }
+  checkAmountNext();
+}
+
+function checkAmountNext() {
+  const val = parseFloat(document.getElementById('amountInput').value);
+  STATE.amount = isNaN(val) ? null : val;
+  document.getElementById('amountNextBtn').disabled = STATE.amount === null;
+}
+
+function prefillDescription() {
+  const input = document.getElementById('descInput');
+  const hint = document.getElementById('descHint');
+  if (STATE.scanned.description && !input.value) {
+    input.value = STATE.scanned.description.substring(0, 20);
+    hint.textContent = 'Auto-filled from receipt scan';
+    hint.className = 'field-hint scanned';
+  }
+  updateDescCount();
+}
+
+function updateDescCount() {
+  const val = document.getElementById('descInput').value;
+  STATE.description = val;
+  document.getElementById('descCount').textContent = `${val.length}/20`;
+}
+
+// ════════════════════════════════════════════
+// SUMMARY
+// ════════════════════════════════════════════
+function buildSummary() {
+  const amt = STATE.amount ? `$${parseFloat(STATE.amount).toFixed(2)}` : '—';
+  const dateStr = STATE.date ? `${STATE.date.getMonth()+1}/${STATE.date.getDate()}/${STATE.date.getFullYear()}` : '—';
+  const bizName = BUSINESS_NAMES[STATE.business] || '—';
+  const propName = STATE.isBusinessExpense ? bizName : (STATE.property || '—');
+  const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
+  const tabName = STATE.business ? `${STATE.business} ${year} Tax Sheet` : '—';
+  document.getElementById('sumAmount').textContent = amt;
+  document.getElementById('sumDate').textContent = dateStr;
+  document.getElementById('sumBusiness').textContent = bizName;
+  document.getElementById('sumProperty').textContent = propName;
+  document.getElementById('sumVendor').textContent = STATE.vendor || '—';
+  document.getElementById('sumPurpose').textContent = STATE.purpose || '—';
+  document.getElementById('sumDesc').textContent = STATE.description || '—';
+  document.getElementById('sumTab').textContent = tabName;
+}
+
+// ════════════════════════════════════════════
+// SUBMIT — with duplicate check
+// ════════════════════════════════════════════
+function getDateStr() {
+  return STATE.date
+    ? `${STATE.date.getFullYear()}-${String(STATE.date.getMonth()+1).padStart(2,'0')}-${String(STATE.date.getDate()).padStart(2,'0')}`
+    : new Date().toISOString().split('T')[0];
+}
+
+function getPropertyAbbr() {
+  if (STATE.isBusinessExpense) return STATE.business;
+  const overrides = CFG.propertyAbbreviations || {};
+  if (overrides[STATE.property]) return overrides[STATE.property];
+  // Auto-generate from initials
+  return (STATE.property || '').split(/\s+/).map(w => w.charAt(0).toUpperCase()).join('');
+}
+
+async function submitEntry() {
+  const btn = document.getElementById('submitBtn');
+  const errEl = document.getElementById('submitError');
+  btn.disabled = true;
+  btn.textContent = 'Checking for duplicates…';
+  errEl.style.display = 'none';
+
+  const dateStr = getDateStr();
+  const checkPayload = {
+    action: 'checkDuplicate',
+    business: STATE.business,
+    isBusinessExpense: STATE.isBusinessExpense,
+    property: STATE.property,
+    propertyAbbr: getPropertyAbbr(),
+    placeOfPurchase: STATE.vendor,
+    date: dateStr,
+    purpose: STATE.purpose,
+    amount: STATE.amount,
+    description: STATE.description
+  };
+
+  try {
+    const resp = await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(checkPayload)
+    });
+    const result = await resp.json();
+
+    btn.disabled = false;
+    btn.textContent = 'Submit to Google Sheets';
+
+    if (result.hasDuplicate) {
+      showDuplicateModal(result);
+    } else {
+      // No duplicates — submit straight away
+      await doSubmit(null);
+    }
+  } catch (err) {
+    // If check fails, still allow submit
+    btn.disabled = false;
+    btn.textContent = 'Submit to Google Sheets';
+    await doSubmit(null);
+  }
+}
+
+// ── Duplicate Modal ──────────────────────────────────────────
+let _dupCheckResult = null;
+
+function showDuplicateModal(result) {
+  _dupCheckResult = result;
+
+  // Build warning cards
+  const cardsEl = document.getElementById('dupModalCards');
+  cardsEl.innerHTML = '';
+
+  result.duplicates.forEach(dup => {
+    const card = document.createElement('div');
+    card.className = 'modal-warn-card' + (dup.exactMatch ? ' exact' : '');
+    const tag = dup.exactMatch ? 'Exact Match in Sheet' : 'Same Amount in Sheet';
+    const tagClass = dup.exactMatch ? 'exact' : 'amount';
+    card.innerHTML = `
+      <div class="modal-warn-tag ${tagClass}">${tag}</div>
+      <div class="modal-warn-row"><span>Row</span><span>${dup.row}</span></div>
+      <div class="modal-warn-row"><span>Vendor</span><span>${dup.vendor || '—'}</span></div>
+      <div class="modal-warn-row"><span>Date</span><span>${dup.date || '—'}</span></div>
+      <div class="modal-warn-row"><span>Purpose</span><span>${dup.purpose || '—'}</span></div>
+      <div class="modal-warn-row"><span>Amount</span><span>$${Math.abs(dup.amount).toFixed(2)}</span></div>`;
+    cardsEl.appendChild(card);
+  });
+
+  if (result.fileExists) {
+    const card = document.createElement('div');
+    card.className = 'modal-warn-card';
+    card.innerHTML = `
+      <div class="modal-warn-tag file">File Already Exists in Drive</div>
+      <div class="modal-warn-row"><span>A file named <strong>${result.fileName}.pdf</strong> already exists in the target folder.</span></div>`;
+    cardsEl.appendChild(card);
+  }
+
+  // Filename display
+  document.getElementById('dupModalFilename').textContent = result.fileName + '.pdf';
+
+  // Show suffix section if file exists
+  const suffixWrap = document.getElementById('dupSuffixWrap');
+  const suffixBtn = document.getElementById('dupSubmitSuffixBtn');
+  if (result.fileExists) {
+    suffixWrap.style.display = 'block';
+    suffixBtn.style.display = 'block';
+    document.getElementById('dupSuffixInput').value = '';
+    document.getElementById('dupSuffixPreview').textContent = result.fileName + '.pdf';
+  } else {
+    suffixWrap.style.display = 'none';
+    suffixBtn.style.display = 'none';
+  }
+
+  // Sub text
+  const msgs = [];
+  if (result.duplicates.length > 0) msgs.push(`${result.duplicates.length} matching sheet entr${result.duplicates.length > 1 ? 'ies' : 'y'}`);
+  if (result.fileExists) msgs.push('a receipt file with the same name');
+  document.getElementById('dupModalSub').textContent = `We found ${msgs.join(' and ')} that may match this receipt. Review below before submitting.`;
+
+  document.getElementById('dupModal').classList.add('open');
+}
+
+function closeDupModal() {
+  document.getElementById('dupModal').classList.remove('open');
+  _dupCheckResult = null;
+}
+
+function updateSuffixPreview() {
+  const suffix = document.getElementById('dupSuffixInput').value.trim();
+  const base = _dupCheckResult ? _dupCheckResult.fileName : '';
+  document.getElementById('dupSuffixPreview').textContent = suffix
+    ? `${base} (${suffix}).pdf`
+    : base + '.pdf';
+}
+
+async function submitWithDuplicateDecision(decision) {
+  if (decision === 'discard') {
+    closeDupModal();
+    resetApp();
+    return;
+  }
+  if (decision === 'back') {
+    closeDupModal();
+    return;
+  }
+
+  const suffix = decision === 'suffix'
+    ? (document.getElementById('dupSuffixInput').value.trim() || null)
+    : null;
+
+  closeDupModal();
+  await doSubmit(suffix);
+}
+
+// ── Final submit to Apps Script ──────────────────────────────
+async function doSubmit(fileNameSuffix) {
+  const btn = document.getElementById('submitBtn');
+  const errEl = document.getElementById('submitError');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  errEl.style.display = 'none';
+
+  const dateStr = getDateStr();
+  const payload = {
+    action: 'addExpense',
+    business: STATE.business,
+    isBusinessExpense: STATE.isBusinessExpense,
+    property: STATE.property,
+    propertyAbbr: getPropertyAbbr(),
+    placeOfPurchase: STATE.vendor,
+    date: dateStr,
+    purpose: STATE.purpose,
+    amount: STATE.amount,
+    description: STATE.description,
+    fileNameSuffix: fileNameSuffix || null,
+    // Only send file if one was uploaded
+    fileBase64: STATE.fileBase64 || null,
+    fileMimeType: STATE.fileMimeType || null
+  };
+
+  try {
+    const resp = await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
+    document.getElementById('successDetail').innerHTML =
+      `Added to <strong>${STATE.business} ${year} Tax Sheet</strong><br>Row ${data.row} • ${STATE.vendor} • $${parseFloat(STATE.amount).toFixed(2)}<br><span style="font-size:11px;color:var(--text-dim)">${data.inserted ? '↕ Inserted in date order — rows below shifted down' : '↓ Appended at end of sheet'}</span>`;
+
+    // Show Drive filing result
+    const driveEl = document.getElementById('driveStatus');
+    const driveTextEl = document.getElementById('driveStatusText');
+    if (data.drive && data.drive.success) {
+      driveEl.style.display = 'flex';
+      driveTextEl.innerHTML = `Saved to Drive: <strong style="color:var(--text)">${data.drive.folderPath}</strong><br>
+        <span style="color:var(--accent)">${data.drive.fileName}</span>
+        ${data.drive.fileUrl ? `· <a href="${data.drive.fileUrl}" target="_blank">View file</a>` : ''}`;
+    } else if (data.drive && data.drive.error) {
+      driveEl.style.display = 'flex';
+      driveTextEl.innerHTML = `⚠️ Sheet saved, but Drive filing failed: ${data.drive.error}`;
+    } else if (!STATE.fileBase64) {
+      driveEl.style.display = 'flex';
+      driveTextEl.innerHTML = `No receipt uploaded — Drive filing skipped.`;
+    }
+
+    goToScreen('success');
+  } catch (err) {
+    errEl.textContent = `Submission failed: ${err.message}`;
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = 'Submit to Google Sheets';
+  }
+}
+
+// ════════════════════════════════════════════
+// HELPERS
+// ════════════════════════════════════════════
+function clearField(id) {
+  document.getElementById(id).value = '';
+  document.getElementById(id).dispatchEvent(new Event('input'));
+}
+
+function resetApp() {
+  STATE.fileBase64 = null; STATE.fileMimeType = null; STATE.scanned = {};
+  STATE.business = null; STATE.isBusinessExpense = false; STATE.property = null;
+  STATE.vendor = ''; STATE.date = null; STATE.purpose = null; STATE.amount = null; STATE.description = '';
+  document.getElementById('previewArea').style.display = 'none';
+  document.getElementById('uploadZone').style.display = 'flex';
+  document.getElementById('uploadNextBtn').disabled = true;
+  document.getElementById('fileInput').value = '';
+  document.getElementById('businessNextBtn').disabled = true;
+  document.querySelectorAll('.checkbox-card').forEach(c => c.classList.remove('selected'));
+  document.querySelectorAll('.cb-badge').forEach(b => b.style.display = 'none');
+  document.getElementById('bizExpenseToggle').classList.remove('active');
+  document.getElementById('vendorInput').value = '';
+  document.getElementById('vendorHint').textContent = '';
+  document.getElementById('vendorHint').className = 'field-hint';
+  document.getElementById('dateInput').value = '';
+  document.getElementById('amountInput').value = '';
+  document.getElementById('descInput').value = '';
+  document.getElementById('purposeGrid').innerHTML = '';
+  document.getElementById('purposeGrid').dataset.loadedFor = '';
+  document.getElementById('purposeNextBtn').disabled = true;
+  document.getElementById('submitError').style.display = 'none';
+  document.getElementById('driveStatus').style.display = 'none';
+  document.getElementById('driveStatusText').innerHTML = '';
+  goToScreen('upload');
+}
+
+// ════════════════════════════════════════════
+// INIT
+// ════════════════════════════════════════════
+window.addEventListener('DOMContentLoaded', () => {
+  CFG = getConfig();
+  renderCalendar();
+  updateBusinessSubtitles();
+
+  if (!CFG.webAppUrl) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById('screen-config').classList.add('active');
+    document.getElementById('progressFill').style.width = '0%';
+    document.getElementById('settingsOpenBtn').style.display = 'none';
+  } else {
+    document.getElementById('settingsOpenBtn').style.display = 'flex';
+    goToScreen('upload');
+  }
+});
+</script>
+</body>
+</html>
