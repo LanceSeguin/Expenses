@@ -1612,31 +1612,89 @@ async function scanReceiptWithVision() {
 function parseReceiptText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const fullText = text;
-  const datePatterns = [
-    /(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})/,
-    /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/i,
-    /(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/
-  ];
-  for (const p of datePatterns) {
-    const m = fullText.match(p);
-    if (m) { try { const d = new Date(m[0]); if (!isNaN(d)) { STATE.scanned.date = d; break; } } catch {} }
+
+  // ── Date parsing ──
+  // Try formats in order of specificity
+  // Format 1: MM-DD-YY or MM-DD-YYYY (e.g. 03-08-26 or 03-08-2026)
+  const mdyDash = fullText.match(/\b(\d{1,2})-(\d{1,2})-(\d{2,4})\b/);
+  if (mdyDash) {
+    let year = parseInt(mdyDash[3]);
+    if (year < 100) year += 2000; // 26 -> 2026
+    const d = new Date(year, parseInt(mdyDash[1]) - 1, parseInt(mdyDash[2]));
+    if (!isNaN(d) && year >= 2020 && year <= 2035) STATE.scanned.date = d;
   }
-  const amountMatches = [...fullText.matchAll(/\$?\s?(\d{1,4}[,.]?\d{0,3}\.\d{2})/g)];
-  if (amountMatches.length) {
-    const amounts = amountMatches.map(m => parseFloat(m[1].replace(',', '')));
-    STATE.scanned.amount = Math.max(...amounts);
-  }
-  const skipWords = /receipt|invoice|total|tax|date|amount|thank|welcome|store|purchase/i;
-  for (const line of lines.slice(0, 8)) {
-    if (line.length > 3 && line.length < 40 && !skipWords.test(line) && !/^\d/.test(line) && !/^\$/.test(line)) {
-      STATE.scanned.vendor = line; break;
+  // Format 2: MM/DD/YYYY or MM/DD/YY
+  if (!STATE.scanned.date) {
+    const mdySlash = fullText.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
+    if (mdySlash) {
+      let year = parseInt(mdySlash[3]);
+      if (year < 100) year += 2000;
+      const d = new Date(year, parseInt(mdySlash[1]) - 1, parseInt(mdySlash[2]));
+      if (!isNaN(d) && year >= 2020 && year <= 2035) STATE.scanned.date = d;
     }
   }
-  const cardMatch = fullText.match(/(?:card|visa|mc|mastercard|amex|ending|xxxx)[^\d]*(\d{4})/i);
+  // Format 3: Month name (Jan 8, 2026 etc)
+  if (!STATE.scanned.date) {
+    const monName = fullText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/i);
+    if (monName) {
+      const d = new Date(monName[0]);
+      if (!isNaN(d)) STATE.scanned.date = d;
+    }
+  }
+
+  // ── Amount — find the total charge/refund on the receipt ──
+  // Look for explicit refund indicators first
+  const refundIndicators = /refund|return|credit|ref\s/i;
+  const isRefund = refundIndicators.test(fullText);
+
+  // Look for the actual transaction total — prioritize VISA/MC/card total,
+  // then TOTAL, then largest amount
+  let foundAmount = null;
+
+  // Priority 1: Card charge line (VISA: 27.60 or VISA XXXXXXXXX1326 AMOUNT: 27.60)
+  const cardAmountMatch = fullText.match(/(?:visa|mastercard|mc|amex|disc)[^\n]*?([\d,]+\.\d{2})/i);
+  if (cardAmountMatch) {
+    foundAmount = parseFloat(cardAmountMatch[1].replace(',', ''));
+  }
+
+  // Priority 2: INVOICE TOTAL or TOTAL line
+  if (!foundAmount) {
+    const totalMatch = fullText.match(/(?:invoice\s+\d+\s+total|total\s+amount|amount\s+due|balance\s+due)[^\d]*([\d,]+\.\d{2})/i);
+    if (totalMatch) foundAmount = parseFloat(totalMatch[1].replace(',', ''));
+  }
+
+  // Priority 3: Largest amount on receipt
+  if (!foundAmount) {
+    const amountMatches = [...fullText.matchAll(/\$?\s?([\d,]+\.\d{2})/g)];
+    if (amountMatches.length) {
+      const amounts = amountMatches.map(m => parseFloat(m[1].replace(',', '')));
+      foundAmount = Math.max(...amounts);
+    }
+  }
+
+  if (foundAmount && foundAmount > 0) {
+    // Charges are negative (expense), refunds are positive
+    STATE.scanned.amount = isRefund ? foundAmount : -foundAmount;
+  }
+
+  // ── Vendor — first meaningful line near top ──
+  const skipWords = /receipt|invoice|total|tax|date|amount|thank|welcome|store|purchase|sign|track|rewards|manage|centers|llc|dr\.|baton|rouge|sale|trans|salesperson/i;
+  for (const line of lines.slice(0, 12)) {
+    if (line.length > 2 && line.length < 35 && !skipWords.test(line) && !/^\d/.test(line) && !/^\$/.test(line) && !/^\*/.test(line) && !/^-/.test(line)) {
+      STATE.scanned.vendor = line;
+      break;
+    }
+  }
+
+  // ── Card last 4 ──
+  const cardMatch = fullText.match(/(?:visa|mc|mastercard|amex|disc|card|xxxx|ending|x{4})[^\d]*(\d{4})/i);
   if (cardMatch) STATE.scanned.cardLast4 = cardMatch[1];
-  const itemLines = lines.filter(l => l.length > 3 && l.length < 30 && !/\$/.test(l) && !/\d{1,2}\/\d{1,2}/.test(l)).slice(2, 6);
+
+  // ── Description — first item line ──
+  const itemLines = lines.filter(l => l.length > 3 && l.length < 30 && !/\$/.test(l) && !/^\*/.test(l) && !/^\d{5,}/.test(l)).slice(3, 7);
   if (itemLines.length) STATE.scanned.description = itemLines[0].substring(0, 20);
 }
+
 
 // ════════════════════════════════════════════
 // BUSINESS SCREEN
@@ -1784,9 +1842,14 @@ async function loadCategories() {
   errEl.style.display = 'none';
   const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
   try {
-    const resp = await fetch(CFG.webAppUrl, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'getCategories', business: STATE.business, year })
+    // Build URL with params — GET request avoids CORS on iPhone Safari
+    const catParams = new URLSearchParams({
+      action: 'getCategories',
+      business: STATE.business,
+      year: year
+    });
+    const resp = await fetch(CFG.webAppUrl + '?' + catParams.toString(), {
+      method: 'GET'
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
@@ -1825,8 +1888,11 @@ function prefillAmount() {
   const input = document.getElementById('amountInput');
   const hint = document.getElementById('amountHint');
   if (STATE.scanned.amount && !input.value) {
-    input.value = STATE.scanned.amount.toFixed(2);
-    hint.textContent = 'Auto-filled from receipt scan';
+    const amt = STATE.scanned.amount;
+    // Show absolute value in the field — negative means expense, positive means refund
+    input.value = Math.abs(amt).toFixed(2);
+    const isRefund = amt > 0;
+    hint.textContent = 'Auto-filled from receipt scan' + (isRefund ? ' — detected as REFUND (positive)' : ' — detected as charge (negative)');
     hint.className = 'field-hint scanned';
   }
   checkAmountNext();
@@ -1834,7 +1900,15 @@ function prefillAmount() {
 
 function checkAmountNext() {
   const val = parseFloat(document.getElementById('amountInput').value);
-  STATE.amount = isNaN(val) ? null : val;
+  if (isNaN(val)) {
+    STATE.amount = null;
+  } else {
+    // Preserve sign from scan — if scanned amount was negative (charge), keep negative
+    // If user typed manually, default to negative (expense)
+    const absVal = Math.abs(val);
+    const wasRefund = STATE.scanned.amount && STATE.scanned.amount > 0;
+    STATE.amount = wasRefund ? absVal : -absVal;
+  }
   document.getElementById('amountNextBtn').disabled = STATE.amount === null;
 }
 
