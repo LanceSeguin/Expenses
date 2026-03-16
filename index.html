@@ -1536,10 +1536,12 @@ async function scanReceiptWithVision() {
 
     if (scanText) scanText.innerHTML = '<strong>Scanning receipt...</strong>';
     const scanPayload = { action: 'scanReceipt', imageBase64: compressed, mimeType: sendMime };
-    const encoded = encodeURIComponent(JSON.stringify(scanPayload));
-    dbg('Payload: ' + Math.round(encoded.length/1024) + 'KB — fetching...');
+    dbg('Payload: ' + Math.round(JSON.stringify(scanPayload).length/1024) + 'KB — fetching...');
 
-    const response = await fetch(CFG.webAppUrl + '?payload=' + encoded, { method: 'GET' });
+    const response = await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      body: JSON.stringify(scanPayload)
+    });
     dbg('HTTP status: ' + response.status);
 
     if (!response.ok) throw new Error('HTTP error ' + response.status);
@@ -1752,8 +1754,9 @@ async function loadCategories() {
   errEl.style.display = 'none';
   const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
   try {
-    const resp = await fetch(CFG.webAppUrl + '?payload=' + encodeURIComponent(JSON.stringify({ action: 'getCategories', business: STATE.business, year })), {
-      method: 'GET'
+    const resp = await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      body: JSON.stringify({ action: 'getCategories', business: STATE.business, year })
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
@@ -1881,8 +1884,9 @@ async function submitEntry() {
   };
 
   try {
-    const resp = await fetch(CFG.webAppUrl + '?payload=' + encodeURIComponent(JSON.stringify(checkPayload)), {
-      method: 'GET'
+    const resp = await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      body: JSON.stringify(checkPayload)
     });
     const result = await resp.json();
 
@@ -2021,8 +2025,9 @@ async function doSubmit(fileNameSuffix) {
   };
 
   try {
-    const resp = await fetch(CFG.webAppUrl + '?payload=' + encodeURIComponent(JSON.stringify(payload)), {
-      method: 'GET'
+    const resp = await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      body: JSON.stringify(payload)
     });
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
