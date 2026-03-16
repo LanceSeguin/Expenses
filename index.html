@@ -1523,13 +1523,16 @@ async function scanReceiptWithVision() {
     const data = await response.json();
 
     if (data.error) throw new Error(data.error);
-    if (data.text) {
+    if (data.text && data.text.trim().length > 0) {
+      // Show first 80 chars of scanned text so we can verify Vision API is working
+      const preview = data.text.trim().substring(0, 80).replace(/
+/g, ' ');
+      if (scanText) scanText.innerHTML = '<strong>Scan Complete</strong>Read: ' + preview + '...';
       parseReceiptText(data.text);
-      if (scanText) scanText.innerHTML = '<strong>Scan Complete</strong>Fields have been auto-filled below.';
-      await new Promise(r => setTimeout(r, 800)); // brief success pause
+      await new Promise(r => setTimeout(r, 3000)); // 3 sec pause so you can read it
     } else {
-      if (scanText) scanText.innerHTML = '<strong>Scan Complete</strong>No text detected — fill in manually.';
-      await new Promise(r => setTimeout(r, 600));
+      if (scanText) scanText.innerHTML = '<strong>No Text Found</strong>Vision API returned empty — check API key.';
+      await new Promise(r => setTimeout(r, 3000));
     }
   } catch (err) {
     console.warn('Scan failed:', err);
