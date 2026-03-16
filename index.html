@@ -736,6 +736,7 @@
         <div class="scan-spinner"></div>
         <div class="scan-text"><strong>Scanning Receipt</strong>Reading date, amount, vendor &amp; items…</div>
       </div>
+      <div id="scanDebug" style="display:none;background:#111;border:1px solid #333;border-radius:8px;padding:12px;margin-top:8px;font-size:11px;font-family:monospace;color:#7eb8e8;max-height:180px;overflow-y:auto;line-height:1.6"></div>
     </div>
 
     <div style="margin-top:auto; padding-top:20px">
@@ -1501,46 +1502,71 @@ async function scanReceiptWithVision() {
   const scanStatus = document.getElementById('scanStatus');
   const scanText = scanStatus.querySelector('.scan-text');
   const nextBtn = document.getElementById('uploadNextBtn');
+  const debugBox = document.getElementById('scanDebug');
+
+  function dbg(msg) {
+    console.log('[SCAN] ' + msg);
+    if (debugBox) debugBox.innerHTML += '<div style="margin:2px 0">' + msg + '</div>';
+  }
+
   scanStatus.style.display = 'flex';
+  if (debugBox) { debugBox.style.display = 'block'; debugBox.innerHTML = '<strong>Debug Log:</strong><br>'; }
   nextBtn.disabled = true;
 
   try {
-    // Step 1: Compress image
-    if (scanText) scanText.innerHTML = '<strong>Preparing Receipt</strong>Compressing image...';
+    dbg('URL: ' + (CFG.webAppUrl ? CFG.webAppUrl.substring(0,60)+'...' : 'MISSING!'));
+    dbg('File: ' + (STATE.fileBase64 ? Math.round(STATE.fileBase64.length/1024)+'KB' : 'NONE!'));
+
+    if (!CFG.webAppUrl) throw new Error('No Web App URL set in Settings');
+    if (!STATE.fileBase64) throw new Error('No image data found');
+
+    if (scanText) scanText.innerHTML = '<strong>Compressing...</strong>';
     const compressed = await compressImage(STATE.fileBase64, STATE.fileMimeType);
     const sendMime = STATE.fileMimeType === 'application/pdf' ? STATE.fileMimeType : 'image/jpeg';
+    dbg('After compress: ' + Math.round(compressed.length/1024) + 'KB');
 
-    // Step 2: Send to Vision API via Apps Script
-    if (scanText) scanText.innerHTML = '<strong>Scanning Receipt</strong>Reading date, amount, vendor & items...';
-
+    if (scanText) scanText.innerHTML = '<strong>Scanning receipt...</strong>';
     const scanPayload = { action: 'scanReceipt', imageBase64: compressed, mimeType: sendMime };
-    const response = await fetch(CFG.webAppUrl + '?payload=' + encodeURIComponent(JSON.stringify(scanPayload)), {
-      method: 'GET',
-    });
+    const encoded = encodeURIComponent(JSON.stringify(scanPayload));
+    dbg('Payload: ' + Math.round(encoded.length/1024) + 'KB — fetching...');
 
-    if (!response.ok) throw new Error('Server returned ' + response.status);
-    const data = await response.json();
+    const response = await fetch(CFG.webAppUrl + '?payload=' + encoded, { method: 'GET' });
+    dbg('HTTP status: ' + response.status);
 
-    if (data.error) throw new Error(data.error);
+    if (!response.ok) throw new Error('HTTP error ' + response.status);
+
+    const rawText = await response.text();
+    dbg('Response length: ' + rawText.length + ' chars');
+    dbg('Response preview: ' + rawText.substring(0, 120));
+
+    let data;
+    try { data = JSON.parse(rawText); }
+    catch(e) { throw new Error('Bad JSON: ' + rawText.substring(0,80)); }
+
+    if (data.error) throw new Error('Script error: ' + data.error);
+
     if (data.text && data.text.trim().length > 0) {
-      // Show first 80 chars of scanned text so we can verify Vision API is working
-      const preview = data.text.trim().substring(0, 80).replace(/
-/g, ' ');
-      if (scanText) scanText.innerHTML = '<strong>Scan Complete</strong>Read: ' + preview + '...';
+      dbg('SUCCESS — text length: ' + data.text.length);
+      dbg('First 100 chars: ' + data.text.substring(0,100).replace(/\n//g,' '));
+      if (scanText) scanText.innerHTML = '<strong>Scan Complete!</strong>';
       parseReceiptText(data.text);
-      await new Promise(r => setTimeout(r, 3000)); // 3 sec pause so you can read it
     } else {
-      if (scanText) scanText.innerHTML = '<strong>No Text Found</strong>Vision API returned empty — check API key.';
-      await new Promise(r => setTimeout(r, 3000));
+      dbg('Empty text. Response keys: ' + Object.keys(data).join(', '));
+      if (scanText) scanText.innerHTML = '<strong>No text found in receipt</strong>';
     }
+    await new Promise(r => setTimeout(r, 5000));
+
   } catch (err) {
-    console.warn('Scan failed:', err);
-    if (scanText) scanText.innerHTML = '<strong>Scan Unavailable</strong>Please fill in the fields manually.';
-    await new Promise(r => setTimeout(r, 1000));
+    dbg('CAUGHT ERROR: ' + err.message);
+    if (scanText) scanText.innerHTML = '<strong>Error:</strong> ' + err.message;
+    await new Promise(r => setTimeout(r, 5000));
   }
+
   scanStatus.style.display = 'none';
+  if (debugBox) debugBox.style.display = 'none';
   nextBtn.disabled = false;
 }
+
 
 function parseReceiptText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
