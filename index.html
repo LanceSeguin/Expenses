@@ -707,13 +707,24 @@
     <div class="screen-title">Upload Receipt</div>
     <div class="screen-sub">Take a photo or upload a PDF. We'll scan it and auto-fill the fields.</div>
 
-    <div id="uploadZone" class="upload-zone" onclick="document.getElementById('fileInput').click()">
-      <div class="upload-icon">
-        <svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <!-- Two separate inputs: camera and file picker -->
+    <input type="file" id="fileInputCamera" accept="image/*" capture="environment" style="display:none" onchange="handleFile(event)" />
+    <input type="file" id="fileInputPicker" accept="image/*,application/pdf" style="display:none" onchange="handleFile(event)" />
+    <div id="uploadZone" style="display:flex; flex-direction:column; gap:12px">
+      <div class="upload-zone" onclick="document.getElementById('fileInputCamera').click()" style="padding:28px 24px; cursor:pointer">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" style="width:24px;height:24px;stroke:var(--accent);fill:none;stroke-width:1.5"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <div class="upload-title">Take a Photo</div>
+        <div class="upload-sub">Open camera to photograph your receipt</div>
       </div>
-      <div class="upload-title">Tap to upload</div>
-      <div class="upload-sub">Photo, screenshot, or PDF from Adobe Scan</div>
-      <input type="file" id="fileInput" accept="image/*,application/pdf" capture="environment" onchange="handleFile(event)" />
+      <div class="upload-zone" onclick="document.getElementById('fileInputPicker').click()" style="padding:22px 24px; cursor:pointer">
+        <div class="upload-icon">
+          <svg viewBox="0 0 24 24" style="width:24px;height:24px;stroke:var(--accent);fill:none;stroke-width:1.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <div class="upload-title">Choose from Files</div>
+        <div class="upload-sub">Pick a photo, screenshot, or PDF from Adobe Scan</div>
+      </div>
     </div>
 
     <div id="previewArea" style="display:none; margin-top:16px">
@@ -1457,7 +1468,8 @@ function removeFile() {
   document.getElementById('previewArea').style.display = 'none';
   document.getElementById('uploadZone').style.display = 'flex';
   document.getElementById('uploadNextBtn').disabled = true;
-  document.getElementById('fileInput').value = '';
+  document.getElementById('fileInputCamera').value = '';
+  document.getElementById('fileInputPicker').value = '';
 }
 
 async function scanReceiptWithVision() {
@@ -1980,7 +1992,8 @@ function resetApp() {
   document.getElementById('previewArea').style.display = 'none';
   document.getElementById('uploadZone').style.display = 'flex';
   document.getElementById('uploadNextBtn').disabled = true;
-  document.getElementById('fileInput').value = '';
+  document.getElementById('fileInputCamera').value = '';
+  document.getElementById('fileInputPicker').value = '';
   document.getElementById('businessNextBtn').disabled = true;
   document.querySelectorAll('.checkbox-card').forEach(c => c.classList.remove('selected'));
   document.querySelectorAll('.cb-badge').forEach(b => b.style.display = 'none');
