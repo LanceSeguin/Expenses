@@ -2234,15 +2234,28 @@ async function doSubmit(fileNameSuffix) {
     return;
   }
 
-  // ── Step 2: Upload receipt to Drive via Apps Script (no-cors POST) ──
-  // Sheet entry is already saved — Drive upload is best-effort
+  // ── Step 2: Upload receipt to Drive via Apps Script ──
+  // Uses regular fetch (not no-cors) so we can read the response
   let driveMsg = '';
   if (STATE.fileBase64) {
     btn.textContent = 'Saving receipt to Drive…';
     try {
-      // Compress image before sending
       const compressed = await compressImage(STATE.fileBase64, STATE.fileMimeType);
       const sendMime = STATE.fileMimeType === 'application/pdf' ? STATE.fileMimeType : 'image/jpeg';
+
+      // Get target folder path first (small GET request)
+      const folderParams = new URLSearchParams({
+        action: 'getFolderForUpload',
+        business: STATE.business,
+        year: year,
+        purpose: STATE.purpose
+      });
+      let folderPath = STATE.business + ' / ' + year + ' Taxes / ' + STATE.purpose;
+      try {
+        const folderResp = await fetch(CFG.webAppUrl + '?' + folderParams.toString());
+        const folderData = await folderResp.json();
+        if (folderData.folderPath) folderPath = folderData.folderPath;
+      } catch(e) {}
 
       const drivePayload = {
         action: 'uploadReceipt',
@@ -2258,43 +2271,29 @@ async function doSubmit(fileNameSuffix) {
         fileNameSuffix: fileNameSuffix || null
       };
 
-      // First get folder path so we can show user exactly where it should appear
-      // Use GET request (not blocked by CORS) to get folder info
-      const folderParams = new URLSearchParams({
-        action: 'getFolderForUpload',
-        business: STATE.business,
-        year: year,
-        purpose: STATE.purpose
-      });
-      let folderPath = 'unknown folder';
-      try {
-        const folderResp = await fetch(CFG.webAppUrl + '?' + folderParams.toString());
-        const folderData = await folderResp.json();
-        if (folderData.folderPath) folderPath = folderData.folderPath;
-      } catch(e) { /* non-fatal */ }
-
-      // Send file via regular POST (same origin rules as sheet submit)
-      // Use regular fetch so we can read success/error response
-      let driveRespData = null;
+      // Try regular fetch first to get response
+      let saved = false;
       try {
         const driveResp = await fetch(CFG.webAppUrl, {
           method: 'POST',
           body: JSON.stringify(drivePayload)
         });
-        driveRespData = await driveResp.json();
+        const driveData = await driveResp.json();
+        if (driveData.error) throw new Error(driveData.error);
+        saved = true;
+        driveMsg = '📁 Saved to: <strong style="color:var(--text)">' + folderPath + '</strong>';
+        if (driveData.drive && driveData.drive.fileName) {
+          driveMsg += '<br><span style="color:var(--accent)">' + driveData.drive.fileName + '</span>';
+        }
       } catch(fetchErr) {
-        // If CORS blocks reading response, fall back to no-cors
+        // Fall back to no-cors if CORS blocks it — file still saves but we cant confirm
         await fetch(CFG.webAppUrl, {
           method: 'POST',
           mode: 'no-cors',
           body: JSON.stringify(drivePayload)
         });
+        driveMsg = '📁 Sent to: <strong style="color:var(--text)">' + folderPath + '</strong><br><span style="font-size:11px;color:var(--text-muted)">Check folder to confirm file saved</span>';
       }
-      if (driveRespData && driveRespData.error) {
-        throw new Error(driveRespData.error);
-      }
-
-      driveMsg = '📁 Receipt sent to: <strong style="color:var(--text)">' + folderPath + '</strong><br><span style="font-size:11px;color:var(--text-muted)">Check that folder in Google Drive to confirm the file saved.</span>';
     } catch(err) {
       driveMsg = '⚠ Sheet saved but Drive upload failed: ' + err.message;
     }
