@@ -1671,13 +1671,9 @@ function parseReceiptText(text) {
     STATE.scanned.date = validCandidates[0].d;
   }
 
-  // ── Amount — find the total charge/refund on the receipt ──
-  // Look for explicit refund indicators first
-  const refundIndicators = /refund|return|credit|ref\s/i;
-  const isRefund = refundIndicators.test(fullText);
-
-  // Look for the actual transaction total — prioritize VISA/MC/card total,
-  // then TOTAL, then largest amount
+  // ── Amount — always negative (expense/charge) ──
+  // Receipt amounts are always positive numbers — we always store as negative
+  // because all scanned receipts are purchases/expenses not refunds
   let foundAmount = null;
 
   // Priority 1: Card charge line (VISA: 27.60 or VISA XXXXXXXXX1326 AMOUNT: 27.60)
@@ -1701,14 +1697,9 @@ function parseReceiptText(text) {
     }
   }
 
+  // Always store as negative — it is always an expense
   if (foundAmount) {
-    // Default: positive on receipt = expense = NEGATIVE in sheet
-    // Only treat as refund/positive if receipt explicitly says refund/return/credit
-    if (isRefund) {
-      STATE.scanned.amount = Math.abs(foundAmount); // refund = positive
-    } else {
-      STATE.scanned.amount = -Math.abs(foundAmount); // charge = negative (regardless of sign on receipt)
-    }
+    STATE.scanned.amount = -Math.abs(foundAmount);
   }
 
   // ── Vendor — first meaningful line near top ──
@@ -1962,12 +1953,10 @@ function prefillAmount() {
   const input = document.getElementById('amountInput');
   const hint = document.getElementById('amountHint');
   if (STATE.scanned.amount && !input.value) {
-    const amt = STATE.scanned.amount;
-    const isRefund = amt > 0;
-    updateSignToggle(isRefund ? '+' : '-');
-    // Show signed value in field so user sees exactly what will be entered
+    const amt = STATE.scanned.amount; // always negative
+    updateSignToggle('-');
     input.value = amt.toFixed(2);
-    hint.textContent = 'Auto-filled from receipt scan — ' + (isRefund ? 'detected as REFUND (+)' : 'detected as charge (−)');
+    hint.textContent = 'Auto-filled from receipt scan';
     hint.className = 'field-hint scanned';
   }
   checkAmountNext();
