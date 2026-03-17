@@ -545,6 +545,36 @@
   }
   .config-field input:focus { border-color: var(--accent); }
 
+  /* ── Property Total Badge ── */
+  .prop-total-badge {
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 20px;
+    letter-spacing: 0.04em;
+    flex-shrink: 0;
+  }
+  .prop-total-positive { background: rgba(90,184,130,0.15); color: var(--success); }
+  .prop-total-negative { background: rgba(224,90,78,0.12); color: var(--danger); }
+  .prop-total-zero { background: var(--surface2); color: var(--text-dim); }
+
+  /* ── Rent Tenant Card ── */
+  .tenant-card {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface); border: 1.5px solid var(--border);
+    border-radius: var(--radius); padding: 14px 16px;
+    cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    margin-bottom: 8px;
+  }
+  .tenant-card:hover { border-color: var(--accent); }
+  .tenant-card.selected { border-color: var(--accent); background: rgba(200,169,110,0.07); }
+  .tenant-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .tenant-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+  .tenant-rent {
+    font-size: 14px; font-weight: 700; color: var(--accent);
+    margin-left: auto; flex-shrink: 0;
+  }
+
   /* ── Duplicate Warning Modal ── */
   .modal-overlay {
     position: fixed; inset: 0; background: rgba(0,0,0,0.85);
@@ -740,7 +770,8 @@
     </div>
 
     <div style="margin-top:auto; padding-top:20px">
-      <button class="btn-primary" id="uploadNextBtn" onclick="goToScreen('business')" disabled>Continue</button>
+      <button class="btn-primary" id="uploadNextBtn" onclick="goToScreen('business')" disabled>Continue with Expense</button>
+      <button class="btn-back" onclick="goToScreen('rent')" style="margin-top:10px;border-color:var(--accent);color:var(--accent)">+ Add Rent Entry</button>
     </div>
   </div>
 
@@ -793,7 +824,8 @@
   <div class="screen" id="screen-property">
     <div class="screen-label">Step 3 of 8</div>
     <div class="screen-title">Which Property?</div>
-    <div class="screen-sub">Select the property associated with this expense.</div>
+    <div class="screen-sub">Select the property. Totals shown are current year profit/loss.</div>
+    <div id="propTotalsLoading" class="loading-cats" style="display:none"><div class="mini-spinner"></div> Loading property totals...</div>
     <div class="checkbox-list" id="propertyList"></div>
     <div style="margin-top:auto; padding-top:20px">
       <button class="btn-primary" id="propertyNextBtn" onclick="goToScreen('vendor')" disabled>Continue</button>
@@ -968,6 +1000,81 @@
       </div>
     </div>
     <button class="btn-primary" onclick="resetApp()" style="margin-top:auto">Add Another Expense</button>
+  </div>
+
+
+  <!-- ══════════════════════════════════ -->
+  <!-- SCREEN: Rent Entry                -->
+  <!-- ══════════════════════════════════ -->
+  <div class="screen" id="screen-rent">
+    <div class="screen-label">Rent Entry</div>
+    <div class="screen-title">Record Rent Payment</div>
+    <div class="screen-sub">Select a tenant — all details will auto-fill from your lease sheet.</div>
+
+    <div id="rentLoadingMsg" class="loading-cats"><div class="mini-spinner"></div> Loading tenants...</div>
+    <div id="rentError" class="error-msg" style="display:none"></div>
+
+    <!-- Tenant list -->
+    <div class="checkbox-list" id="rentTenantList"></div>
+
+    <!-- Property picker — only shown for EBR Housing Authority -->
+    <div id="rentPropertyPicker" style="display:none; margin-top:16px">
+      <div style="font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--accent);margin-bottom:10px">Which property is this payment for?</div>
+      <div class="checkbox-list" id="rentPropertyList"></div>
+    </div>
+
+    <!-- Date -->
+    <div class="field-wrap" id="rentDateWrap" style="display:none; margin-top:16px">
+      <label class="field-label">Date of Payment</label>
+      <div class="field-input-wrap">
+        <input type="text" id="rentDateInput" placeholder="MM/DD/YYYY" inputmode="numeric"
+               oninput="handleRentDateInput(this.value)" onblur="parseRentDateInput(this.value)" autocomplete="off" />
+        <button class="field-clear" onclick="clearField('rentDateInput'); STATE.rentDate=null; document.getElementById('rentDateNextBtn').disabled=true">×</button>
+      </div>
+    </div>
+    <div class="calendar-wrap" id="rentCalWrap" style="display:none">
+      <div class="cal-header">
+        <button class="cal-nav" onclick="rentCalNav(-1)">‹</button>
+        <div class="cal-month-year" id="rentCalMonthYear"></div>
+        <button class="cal-nav" onclick="rentCalNav(1)">›</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-days-header">
+          <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div>
+          <div class="cal-day-label">Tu</div><div class="cal-day-label">We</div>
+          <div class="cal-day-label">Th</div><div class="cal-day-label">Fr</div>
+          <div class="cal-day-label">Sa</div>
+        </div>
+        <div class="cal-cells" id="rentCalCells"></div>
+      </div>
+    </div>
+
+    <!-- Amount -->
+    <div class="field-wrap" id="rentAmountWrap" style="display:none">
+      <label class="field-label">Rent Amount</label>
+      <div class="field-input-wrap">
+        <span class="amount-prefix">$</span>
+        <input type="text" id="rentAmountInput" placeholder="0.00" inputmode="decimal"
+               autocomplete="off" oninput="checkRentNext()" />
+        <button class="field-clear" onclick="clearField('rentAmountInput'); checkRentNext()">×</button>
+      </div>
+      <div id="rentAmountHint" class="field-hint"></div>
+    </div>
+
+    <!-- Description -->
+    <div class="field-wrap" id="rentDescWrap" style="display:none">
+      <label class="field-label">Description <span id="rentDescCount" style="color:var(--text-dim);font-weight:400">0/20</span></label>
+      <div class="field-input-wrap">
+        <input type="text" id="rentDescInput" placeholder="e.g. March Rent" maxlength="20"
+               oninput="updateRentDescCount()" />
+        <button class="field-clear" onclick="clearField('rentDescInput'); updateRentDescCount()">×</button>
+      </div>
+    </div>
+
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" id="rentSubmitBtn" onclick="submitRent()" disabled>Submit Rent Entry</button>
+      <button class="btn-back" onclick="goToScreen('upload')">← Back</button>
+    </div>
   </div>
 
 </div><!-- /#app -->
@@ -1465,7 +1572,8 @@ function goToScreen(name) {
   if (name === 'amount') setTimeout(prefillAmount, 50);
   if (name === 'description') setTimeout(prefillDescription, 50);
   if (name === 'business') { updateBusinessSubtitles(); setTimeout(suggestBusiness, 100); }
-  if (name === 'property') buildPropertyList();
+  if (name === 'property') { buildPropertyList(); loadPropertyTotals(); }
+  if (name === 'rent') { setTimeout(loadRentScreen, 50); }
   if (name === 'purpose') loadCategories();
   if (name === 'summary') buildSummary();
 
@@ -1779,7 +1887,21 @@ function buildPropertyList() {
   props.forEach(p => {
     const card = document.createElement('div');
     card.className = 'checkbox-card' + (STATE.property === p ? ' selected' : '');
-    card.innerHTML = `<div class="cb-box"><svg class="cb-check" width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="cb-label">${p}</div>`;
+
+    // Build total badge if available
+    let totalBadge = '';
+    if (propertyTotalsCache && propertyTotalsCache[p] !== undefined) {
+      const total = propertyTotalsCache[p];
+      const fmt = (total >= 0 ? '+' : '') + '$' + Math.abs(total).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2});
+      const cls = total > 0 ? 'prop-total-positive' : total < 0 ? 'prop-total-negative' : 'prop-total-zero';
+      totalBadge = `<span class="prop-total-badge ${cls}">${fmt}</span>`;
+    }
+
+    card.innerHTML = `
+      <div class="cb-box"><svg class="cb-check" width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div class="cb-label" style="flex:1">${p}</div>
+      ${totalBadge}`;
+
     card.onclick = () => {
       STATE.property = p;
       document.querySelectorAll('#propertyList .checkbox-card').forEach(c => c.classList.remove('selected'));
@@ -2360,6 +2482,348 @@ function abbreviateVendor(vendor) {
   return vendor.toUpperCase().substring(0, 6);
 }
 
+
+// ════════════════════════════════════════════
+// RENT ENTRY
+// ════════════════════════════════════════════
+const RENT_STATE = {
+  tenants: [],
+  selectedTenant: null,
+  selectedProperty: null,
+  selectedBusiness: null,
+  rentDate: null,
+  rentCalYear: new Date().getFullYear(),
+  rentCalMonth: new Date().getMonth(),
+};
+
+async function loadRentScreen() {
+  const list = document.getElementById('rentTenantList');
+  const loading = document.getElementById('rentLoadingMsg');
+  const errEl = document.getElementById('rentError');
+
+  if (RENT_STATE.tenants.length > 0) {
+    renderTenantList();
+    return;
+  }
+
+  loading.style.display = 'flex';
+  errEl.style.display = 'none';
+  list.innerHTML = '';
+
+  try {
+    const resp = await fetch(CFG.webAppUrl + '?action=getTenants');
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+    RENT_STATE.tenants = data.tenants;
+    loading.style.display = 'none';
+    renderTenantList();
+  } catch(err) {
+    loading.style.display = 'none';
+    errEl.textContent = 'Could not load tenants: ' + err.message;
+    errEl.style.display = 'block';
+  }
+}
+
+function renderTenantList() {
+  const list = document.getElementById('rentTenantList');
+  list.innerHTML = '';
+  RENT_STATE.tenants.forEach((t, i) => {
+    const card = document.createElement('div');
+    card.className = 'tenant-card' + (RENT_STATE.selectedTenant === i ? ' selected' : '');
+    card.innerHTML = `
+      <div style="flex:1">
+        <div class="tenant-name">${t.name}</div>
+        <div class="tenant-sub">${t.property} &middot; ${t.business}</div>
+      </div>
+      <div class="tenant-rent">$${t.rent.toFixed(2)}</div>`;
+    card.onclick = () => selectTenant(i);
+    list.appendChild(card);
+  });
+}
+
+function selectTenant(idx) {
+  RENT_STATE.selectedTenant = idx;
+  RENT_STATE.selectedProperty = null; // reset property selection
+  renderTenantList();
+
+  const t = RENT_STATE.tenants[idx];
+  const isHousing = t.name.toLowerCase().includes('ebr housing') ||
+                    t.name.toLowerCase().includes('housing authority');
+
+  // Hide/show property picker for EBR Housing Authority
+  const propPicker = document.getElementById('rentPropertyPicker');
+  if (isHousing) {
+    buildRentPropertyPicker();
+    propPicker.style.display = 'block';
+    // Hide fields until property is chosen
+    document.getElementById('rentDateWrap').style.display = 'none';
+    document.getElementById('rentCalWrap').style.display = 'none';
+    document.getElementById('rentAmountWrap').style.display = 'none';
+    document.getElementById('rentDescWrap').style.display = 'none';
+    document.getElementById('rentSubmitBtn').disabled = true;
+    return;
+  } else {
+    propPicker.style.display = 'none';
+    RENT_STATE.selectedProperty = t.property;
+    RENT_STATE.selectedBusiness = t.business;
+  }
+
+  showRentFields(t);
+}
+
+function buildRentPropertyPicker() {
+  // Combine all properties from both businesses
+  const allProps = [
+    ...CFG.LNI.props.map(p => ({ prop: p, biz: 'LNI' })),
+    ...CFG.LNEP.props.map(p => ({ prop: p, biz: 'LNEP' }))
+  ];
+  const list = document.getElementById('rentPropertyList');
+  list.innerHTML = '';
+  allProps.forEach(({ prop, biz }) => {
+    const card = document.createElement('div');
+    card.className = 'checkbox-card' + (RENT_STATE.selectedProperty === prop ? ' selected' : '');
+    card.innerHTML = `
+      <div class="cb-box"><svg class="cb-check" width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+      <div style="flex:1">
+        <div class="cb-label">${prop}</div>
+        <div class="cb-sub">${biz === 'LNI' ? 'LN Investments' : 'LNE Properties'}</div>
+      </div>`;
+    card.onclick = () => {
+      RENT_STATE.selectedProperty = prop;
+      RENT_STATE.selectedBusiness = biz;
+      document.querySelectorAll('#rentPropertyList .checkbox-card').forEach(c => c.classList.remove('selected'));
+      card.classList.add('selected');
+      // Now show the rest of the fields
+      const t = RENT_STATE.tenants[RENT_STATE.selectedTenant];
+      showRentFields(t);
+    };
+    list.appendChild(card);
+  });
+}
+
+function showRentFields(t) {
+  // Show fields
+  document.getElementById('rentDateWrap').style.display = 'block';
+  document.getElementById('rentCalWrap').style.display = 'block';
+  document.getElementById('rentAmountWrap').style.display = 'block';
+  document.getElementById('rentDescWrap').style.display = 'block';
+
+  // Default date to today
+  if (!RENT_STATE.rentDate) {
+    const today = new Date();
+    RENT_STATE.rentDate = today;
+    RENT_STATE.rentCalYear = today.getFullYear();
+    RENT_STATE.rentCalMonth = today.getMonth();
+    document.getElementById('rentDateInput').value =
+      (today.getMonth()+1) + '/' + today.getDate() + '/' + today.getFullYear();
+  }
+  renderRentCalendar();
+
+  // Auto-fill amount from lease
+  const amtInput = document.getElementById('rentAmountInput');
+  const amtHint = document.getElementById('rentAmountHint');
+  if (!amtInput.value && t.rent > 0) {
+    amtInput.value = t.rent.toFixed(2);
+    amtHint.textContent = 'Auto-filled from lease sheet';
+    amtHint.className = 'field-hint scanned';
+  }
+
+  // Auto-fill description
+  updateRentDescription();
+  checkRentNext();
+}
+
+function updateRentDescription() {
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  const d = RENT_STATE.rentDate || new Date();
+  const desc = months[d.getMonth()].substring(0,6) + ' Rent'; // e.g. "March Rent" = 10 chars
+  const full = months[d.getMonth()] + ' Rent';
+  const final = full.length <= 20 ? full : desc;
+  document.getElementById('rentDescInput').value = final;
+  updateRentDescCount();
+}
+
+function updateRentDescCount() {
+  const val = document.getElementById('rentDescInput').value;
+  document.getElementById('rentDescCount').textContent = val.length + '/20';
+}
+
+// Rent date handlers
+function handleRentDateInput(val) {
+  const digits = val.replace(/\D/g, '');
+  let fmt = digits;
+  if (digits.length > 2) fmt = digits.substring(0,2) + '/' + digits.substring(2);
+  if (digits.length > 4) fmt = digits.substring(0,2) + '/' + digits.substring(2,4) + '/' + digits.substring(4,8);
+  const input = document.getElementById('rentDateInput');
+  if (fmt !== val) input.value = fmt;
+  parseRentDateInput(fmt);
+}
+
+function parseRentDateInput(val) {
+  const parts = val.split('/');
+  if (parts.length === 3) {
+    const mo = parseInt(parts[0]), dy = parseInt(parts[1]);
+    let yr = parseInt(parts[2]);
+    if (yr < 100) yr += 2000;
+    if (mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31 && yr >= 2020 && yr <= 2035) {
+      const d = new Date(yr, mo-1, dy);
+      if (!isNaN(d)) {
+        RENT_STATE.rentDate = d;
+        RENT_STATE.rentCalYear = yr;
+        RENT_STATE.rentCalMonth = mo - 1;
+        renderRentCalendar();
+        updateRentDescription();
+        checkRentNext();
+      }
+    }
+  }
+}
+
+function rentCalNav(dir) {
+  RENT_STATE.rentCalMonth += dir;
+  if (RENT_STATE.rentCalMonth > 11) { RENT_STATE.rentCalMonth = 0; RENT_STATE.rentCalYear++; }
+  if (RENT_STATE.rentCalMonth < 0)  { RENT_STATE.rentCalMonth = 11; RENT_STATE.rentCalYear--; }
+  renderRentCalendar();
+}
+
+function renderRentCalendar() {
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  document.getElementById('rentCalMonthYear').textContent =
+    months[RENT_STATE.rentCalMonth] + ' ' + RENT_STATE.rentCalYear;
+
+  const cells = document.getElementById('rentCalCells');
+  cells.innerHTML = '';
+  const firstDay = new Date(RENT_STATE.rentCalYear, RENT_STATE.rentCalMonth, 1).getDay();
+  const daysInMonth = new Date(RENT_STATE.rentCalYear, RENT_STATE.rentCalMonth + 1, 0).getDate();
+  const today = new Date();
+
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-cell empty';
+    cells.appendChild(el);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const el = document.createElement('div');
+    el.className = 'cal-cell';
+    el.textContent = d;
+    const cellDate = new Date(RENT_STATE.rentCalYear, RENT_STATE.rentCalMonth, d);
+    if (today.toDateString() === cellDate.toDateString()) el.classList.add('today');
+    if (RENT_STATE.rentDate && RENT_STATE.rentDate.toDateString() === cellDate.toDateString()) el.classList.add('selected');
+    el.onclick = () => {
+      RENT_STATE.rentDate = new Date(RENT_STATE.rentCalYear, RENT_STATE.rentCalMonth, d);
+      document.getElementById('rentDateInput').value =
+        (RENT_STATE.rentCalMonth+1) + '/' + d + '/' + RENT_STATE.rentCalYear;
+      updateRentDescription();
+      renderRentCalendar();
+      checkRentNext();
+    };
+    cells.appendChild(el);
+  }
+}
+
+function checkRentNext() {
+  const amt = parseFloat(document.getElementById('rentAmountInput').value);
+  const hasDate = !!RENT_STATE.rentDate;
+  const hasTenant = RENT_STATE.selectedTenant !== null;
+  const hasAmt = !isNaN(amt) && amt > 0;
+  document.getElementById('rentSubmitBtn').disabled = !(hasDate && hasTenant && hasAmt);
+}
+
+async function submitRent() {
+  const btn = document.getElementById('rentSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+
+  const t = RENT_STATE.tenants[RENT_STATE.selectedTenant];
+  const d = RENT_STATE.rentDate;
+  const dateStr = d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0');
+  const amount = parseFloat(document.getElementById('rentAmountInput').value);
+  const desc = document.getElementById('rentDescInput').value.trim();
+
+  // Use selected property/business (may differ from tenant default for EBR Housing)
+  const property = RENT_STATE.selectedProperty || t.property;
+  const business = RENT_STATE.selectedBusiness || t.business;
+
+  const payload = {
+    action: 'addRent',
+    business: business,
+    property: property,
+    tenantName: t.name,
+    date: dateStr,
+    amount: amount,
+    description: desc
+  };
+
+  try {
+    await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify(payload)
+    });
+
+    // Reset and show success
+    document.getElementById('successDetail').innerHTML =
+      `Rent recorded for <strong>${t.name}</strong><br>` +
+      `${property} &middot; $${amount.toFixed(2)} &middot; ${desc}<br>` +
+      `<span style="font-size:11px;color:var(--text-dim)">Verify entry appeared in your sheet</span>`;
+    document.getElementById('driveStatus').style.display = 'none';
+
+    // Reset rent state
+    RENT_STATE.selectedTenant = null;
+    RENT_STATE.rentDate = null;
+    document.getElementById('rentDateInput').value = '';
+    document.getElementById('rentAmountInput').value = '';
+    document.getElementById('rentDescInput').value = '';
+    document.getElementById('rentDateWrap').style.display = 'none';
+    document.getElementById('rentCalWrap').style.display = 'none';
+    document.getElementById('rentAmountWrap').style.display = 'none';
+    document.getElementById('rentDescWrap').style.display = 'none';
+    RENT_STATE.tenants = []; // reload next time
+    RENT_STATE.selectedProperty = null;
+    RENT_STATE.selectedBusiness = null;
+    document.getElementById('rentPropertyPicker').style.display = 'none';
+    document.getElementById('rentPropertyList').innerHTML = '';
+
+    goToScreen('success');
+  } catch(err) {
+    btn.disabled = false;
+    btn.textContent = 'Submit Rent Entry';
+    document.getElementById('rentError').textContent = 'Failed: ' + err.message;
+    document.getElementById('rentError').style.display = 'block';
+  }
+}
+
+// ════════════════════════════════════════════
+// PROPERTY TOTALS
+// ════════════════════════════════════════════
+let propertyTotalsCache = null;
+
+async function loadPropertyTotals() {
+  const loading = document.getElementById('propTotalsLoading');
+  if (propertyTotalsCache) { rebuildPropertyListWithTotals(); return; }
+  if (loading) loading.style.display = 'flex';
+  try {
+    const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
+    const resp = await fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year);
+    const data = await resp.json();
+    if (!data.error) {
+      propertyTotalsCache = data.totals;
+      rebuildPropertyListWithTotals();
+    }
+  } catch(e) {}
+  if (loading) loading.style.display = 'none';
+}
+
+function rebuildPropertyListWithTotals() {
+  const loading = document.getElementById('propTotalsLoading');
+  if (loading) loading.style.display = 'none';
+  // Re-render property list with totals
+  buildPropertyList();
+}
 
 // ════════════════════════════════════════════
 // HELPERS
