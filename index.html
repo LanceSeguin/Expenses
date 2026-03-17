@@ -832,7 +832,7 @@
     <div class="field-wrap">
       <label class="field-label">Selected Date</label>
       <div class="field-input-wrap">
-        <input type="tel" id="dateInput" placeholder="MM/DD/YYYY" oninput="handleDateInput(this.value)" onblur="parseDateInput(this.value)" autocomplete="off" />
+        <input type="text" id="dateInput" placeholder="MM/DD/YYYY" inputmode="numeric" oninput="handleDateInput(this.value)" onblur="parseDateInput(this.value)" autocomplete="off" />
         <button class="field-clear" onclick="clearDateField()">×</button>
       </div>
       <div id="dateHint" class="field-hint"></div>
@@ -887,10 +887,12 @@
     <div class="field-wrap">
       <label class="field-label">Total Amount</label>
       <div class="field-input-wrap">
+        <button id="signToggleBtn" onclick="toggleAmountSign()" style="background:var(--surface2);border:none;border-right:1.5px solid var(--border);padding:0 14px;font-size:18px;font-weight:700;color:var(--accent);cursor:pointer;height:100%;display:flex;align-items:center;min-width:44px;justify-content:center;flex-shrink:0">−</button>
         <span class="amount-prefix">$</span>
-        <input type="tel" id="amountInput" placeholder="0.00" autocomplete="off" oninput="checkAmountNext()" />
+        <input type="text" id="amountInput" placeholder="0.00" inputmode="decimal" autocomplete="off" oninput="checkAmountNext()" />
         <button class="field-clear" onclick="clearField('amountInput'); checkAmountNext()">×</button>
       </div>
+      <div style="font-size:11px;color:var(--text-muted);margin-top:5px">Tap <strong>−/+</strong> to toggle between expense (−) and refund (+)</div>
       <div id="amountHint" class="field-hint"></div>
     </div>
     <div style="margin-top:auto; padding-top:20px">
@@ -1962,22 +1964,47 @@ function prefillAmount() {
   const hint = document.getElementById('amountHint');
   if (STATE.scanned.amount && !input.value) {
     const amt = STATE.scanned.amount;
-    // Show the signed value directly — negative = expense, positive = refund
-    input.value = amt.toFixed(2);
     const isRefund = amt > 0;
-    hint.textContent = 'Auto-filled from receipt scan — ' + (isRefund ? 'detected as REFUND' : 'detected as charge');
+    // Show absolute value in field — sign shown by toggle button
+    input.value = Math.abs(amt).toFixed(2);
+    updateSignToggle(isRefund ? '+' : '-');
+    hint.textContent = 'Auto-filled from receipt scan — ' + (isRefund ? 'detected as REFUND (+)' : 'detected as charge (−)');
     hint.className = 'field-hint scanned';
   }
   checkAmountNext();
 }
 
+function updateSignToggle(sign) {
+  const btn = document.getElementById('signToggleBtn');
+  if (!btn) return;
+  if (sign === '+') {
+    btn.textContent = '+';
+    btn.style.color = 'var(--success)';
+    btn.dataset.sign = '+';
+  } else {
+    btn.textContent = '−';
+    btn.style.color = 'var(--accent)';
+    btn.dataset.sign = '-';
+  }
+}
+
+function toggleAmountSign() {
+  const btn = document.getElementById('signToggleBtn');
+  const current = btn.dataset.sign || '-';
+  updateSignToggle(current === '-' ? '+' : '-');
+  checkAmountNext();
+}
+
 function checkAmountNext() {
   const raw = document.getElementById('amountInput').value.trim();
-  const val = parseFloat(raw);
-  if (isNaN(val) || raw === '' || raw === '-') {
+  const absVal = parseFloat(raw);
+  if (isNaN(absVal) || raw === '') {
     STATE.amount = null;
   } else {
-    STATE.amount = val; // use exactly what user has typed — sign included
+    // Apply sign from toggle button
+    const btn = document.getElementById('signToggleBtn');
+    const sign = btn ? (btn.dataset.sign || '-') : '-';
+    STATE.amount = sign === '+' ? Math.abs(absVal) : -Math.abs(absVal);
   }
   document.getElementById('amountNextBtn').disabled = STATE.amount === null;
 }
@@ -2183,8 +2210,9 @@ async function doSubmit(fileNameSuffix) {
   errEl.style.display = 'none';
 
   const dateStr = getDateStr();
+  const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
 
-  // ── Step 1: Write row to Google Sheet (no-cors, small payload) ──
+  // ── Step 1: Write row to sheet (no-cors POST, small payload) ──
   const sheetPayload = {
     action: 'addExpense',
     business: STATE.business,
@@ -2196,9 +2224,7 @@ async function doSubmit(fileNameSuffix) {
     purpose: STATE.purpose,
     amount: STATE.amount,
     description: STATE.description,
-    fileNameSuffix: fileNameSuffix || null,
-    fileBase64: null,      // send file separately
-    fileMimeType: null
+    fileNameSuffix: fileNameSuffix || null
   };
 
   try {
@@ -2215,28 +2241,47 @@ async function doSubmit(fileNameSuffix) {
     return;
   }
 
-  // ── Step 2: Upload receipt to Drive directly via Drive API ──
-  const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
+  // ── Step 2: Upload receipt to Drive via Apps Script (no-cors POST) ──
+  // Sheet entry is already saved — Drive upload is best-effort
   let driveMsg = '';
-
-  if (STATE.fileBase64 && CFG.visionApiKey) {
+  if (STATE.fileBase64) {
     btn.textContent = 'Saving receipt to Drive…';
     try {
-      driveMsg = await uploadReceiptToDrive(fileNameSuffix, year);
+      // Compress image before sending
+      const compressed = await compressImage(STATE.fileBase64, STATE.fileMimeType);
+      const sendMime = STATE.fileMimeType === 'application/pdf' ? STATE.fileMimeType : 'image/jpeg';
+
+      const drivePayload = {
+        action: 'uploadReceipt',
+        business: STATE.business,
+        isBusinessExpense: STATE.isBusinessExpense,
+        property: STATE.property,
+        propertyAbbr: getPropertyAbbr(),
+        placeOfPurchase: STATE.vendor,
+        date: dateStr,
+        purpose: STATE.purpose,
+        fileBase64: compressed,
+        fileMimeType: sendMime,
+        fileNameSuffix: fileNameSuffix || null
+      };
+
+      // Use no-cors — Drive will still save even though we cant read the response
+      await fetch(CFG.webAppUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify(drivePayload)
+      });
+
+      driveMsg = '📁 Receipt sent to Drive — check your folder to confirm it saved.';
     } catch(err) {
       driveMsg = '⚠ Sheet saved but Drive upload failed: ' + err.message;
     }
-  } else if (!STATE.fileBase64) {
-    driveMsg = 'No receipt uploaded — Drive filing skipped.';
-  } else {
-    driveMsg = '⚠ No API key — Drive filing skipped. Add Vision API key in Settings.';
   }
 
-  // ── Show success ──
-  const year2 = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
+  // ── Show success screen ──
   document.getElementById('successDetail').innerHTML =
-    `Added to <strong>${STATE.business} ${year2} Tax Sheet</strong><br>` +
-    `${STATE.vendor} • $${Math.abs(parseFloat(STATE.amount)).toFixed(2)}<br>` +
+    `Added to <strong>${STATE.business} ${year} Tax Sheet</strong><br>` +
+    `${STATE.vendor} • $${Math.abs(parseFloat(STATE.amount || 0)).toFixed(2)}<br>` +
     `<span style="font-size:11px;color:var(--text-dim)">Verify the entry appeared in your sheet</span>`;
 
   const driveEl = document.getElementById('driveStatus');
@@ -2244,75 +2289,14 @@ async function doSubmit(fileNameSuffix) {
   if (driveMsg) {
     driveEl.style.display = 'flex';
     driveTextEl.innerHTML = driveMsg;
+  } else {
+    driveEl.style.display = 'none';
   }
 
   goToScreen('success');
 }
 
-// Upload receipt PDF directly to Google Drive from browser
-// Uses Drive API with the Vision API key (same Google Cloud project)
-async function uploadReceiptToDrive(fileNameSuffix, year) {
-  // Build filename
-  const dateObj = STATE.date || new Date();
-  const mo = dateObj.getMonth() + 1;
-  const dy = dateObj.getDate();
-  let propAbbr = getPropertyAbbr();
-  const vendor = (STATE.vendor || '').trim();
-  const vendorAbbr = abbreviateVendor(vendor);
-  let fileName = `${propAbbr} ${vendorAbbr} ${mo}-${dy}`;
-  if (fileNameSuffix) fileName += ` (${fileNameSuffix})`;
-  fileName += '.pdf';
 
-  // Get folder ID from Apps Script via GET (small request, no CORS issue)
-  const folderParams = new URLSearchParams({
-    action: 'getFolderForUpload',
-    business: STATE.business,
-    year: year,
-    purpose: STATE.purpose
-  });
-  const folderResp = await fetch(CFG.webAppUrl + '?' + folderParams.toString());
-  const folderData = await folderResp.json();
-  if (folderData.error) throw new Error(folderData.error);
-  const folderId = folderData.folderId;
-  const folderPath = folderData.folderPath;
-
-  // Convert to PDF blob
-  const pdfBase64 = await convertToPdf(STATE.fileBase64, STATE.fileMimeType);
-
-  // Upload to Drive using multipart upload
-  const boundary = 'receipt_boundary_' + Date.now();
-  const metadata = JSON.stringify({ name: fileName, parents: [folderId], mimeType: 'application/pdf' });
-
-  // Build multipart body
-  const metaPart = `--${boundary}
-Content-Type: application/json; charset=UTF-8
-
-${metadata}
-`;
-  const dataPart = `--${boundary}
-Content-Type: application/pdf
-Content-Transfer-Encoding: base64
-
-${pdfBase64}
---${boundary}--`;
-  const body = metaPart + dataPart;
-
-  const uploadResp = await fetch(
-    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&key=${CFG.visionApiKey}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
-      body: body
-    }
-  );
-
-  const uploadData = await uploadResp.json();
-  if (uploadData.error) throw new Error(uploadData.error.message);
-
-  return `📁 Saved to Drive: <strong style="color:var(--text)">${folderPath}</strong><br><span style="color:var(--accent)">${fileName}</span>`;
-}
-
-// Convert image to PDF using canvas
 async function convertToPdf(base64, mimeType) {
   if (mimeType === 'application/pdf') return base64;
   // For images, re-compress as JPEG (Drive API accepts JPEG uploaded as PDF via Apps Script)
@@ -2365,6 +2349,7 @@ function resetApp() {
   document.getElementById('vendorHint').className = 'field-hint';
   document.getElementById('dateInput').value = '';
   document.getElementById('amountInput').value = '';
+  updateSignToggle('-');
   document.getElementById('descInput').value = '';
   document.getElementById('purposeGrid').innerHTML = '';
   document.getElementById('purposeGrid').dataset.loadedFor = '';
