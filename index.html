@@ -832,7 +832,7 @@
     <div class="field-wrap">
       <label class="field-label">Selected Date</label>
       <div class="field-input-wrap">
-        <input type="text" id="dateInput" placeholder="MM/DD/YYYY" readonly style="cursor:pointer" />
+        <input type="text" id="dateInput" placeholder="MM/DD/YYYY" inputmode="numeric" oninput="handleDateInput(this.value)" onblur="parseDateInput(this.value)" style="cursor:text" />
         <button class="field-clear" onclick="clearDateField()">×</button>
       </div>
       <div id="dateHint" class="field-hint"></div>
@@ -888,7 +888,7 @@
       <label class="field-label">Total Amount</label>
       <div class="field-input-wrap">
         <span class="amount-prefix">$</span>
-        <input type="number" id="amountInput" placeholder="0.00" step="0.01" min="0" oninput="checkAmountNext()" />
+        <input type="number" id="amountInput" placeholder="0.00" step="0.01" min="0" inputmode="decimal" oninput="checkAmountNext()" />
         <button class="field-clear" onclick="clearField('amountInput'); checkAmountNext()">×</button>
       </div>
       <div id="amountHint" class="field-hint"></div>
@@ -1614,32 +1614,59 @@ function parseReceiptText(text) {
   const fullText = text;
 
   // ── Date parsing ──
-  // Try formats in order of specificity
-  // Format 1: MM-DD-YY or MM-DD-YYYY (e.g. 03-08-26 or 03-08-2026)
-  const mdyDash = fullText.match(/\b(\d{1,2})-(\d{1,2})-(\d{2,4})\b/);
-  if (mdyDash) {
-    let year = parseInt(mdyDash[3]);
-    if (year < 100) year += 2000; // 26 -> 2026
-    const d = new Date(year, parseInt(mdyDash[1]) - 1, parseInt(mdyDash[2]));
-    if (!isNaN(d) && year >= 2020 && year <= 2035) STATE.scanned.date = d;
-  }
-  // Format 2: MM/DD/YYYY or MM/DD/YY
-  if (!STATE.scanned.date) {
-    const mdySlash = fullText.match(/\b(\d{1,2})\/(\d{1,2})\/(\d{2,4})\b/);
-    if (mdySlash) {
-      let year = parseInt(mdySlash[3]);
-      if (year < 100) year += 2000;
-      const d = new Date(year, parseInt(mdySlash[1]) - 1, parseInt(mdySlash[2]));
-      if (!isNaN(d) && year >= 2020 && year <= 2035) STATE.scanned.date = d;
+  // Collect all date candidates and score them, pick the best
+  const dateCandidates = [];
+
+  // Format 1: MM-DD-YY or MM-DD-YYYY (e.g. 03-08-26)
+  const re1 = /(\d{1,2})-(\d{1,2})-(\d{2,4})/g;
+  let m1;
+  while ((m1 = re1.exec(fullText)) !== null) {
+    let yr = parseInt(m1[3]);
+    if (yr < 100) yr += 2000;
+    const mo = parseInt(m1[1]), dy = parseInt(m1[2]);
+    if (yr >= 2020 && yr <= 2035 && mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31) {
+      dateCandidates.push({ d: new Date(yr, mo-1, dy), score: 3 });
     }
   }
-  // Format 3: Month name (Jan 8, 2026 etc)
-  if (!STATE.scanned.date) {
-    const monName = fullText.match(/(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/i);
-    if (monName) {
-      const d = new Date(monName[0]);
-      if (!isNaN(d)) STATE.scanned.date = d;
+
+  // Format 2: MM/DD/YY or MM/DD/YYYY (e.g. 03/08/26)
+  const re2 = /(\d{1,2})\/(\d{1,2})\/(\d{2,4})/g;
+  let m2;
+  while ((m2 = re2.exec(fullText)) !== null) {
+    let yr = parseInt(m2[3]);
+    if (yr < 100) yr += 2000;
+    const mo = parseInt(m2[1]), dy = parseInt(m2[2]);
+    if (yr >= 2020 && yr <= 2035 && mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31) {
+      dateCandidates.push({ d: new Date(yr, mo-1, dy), score: 3 });
     }
+  }
+
+  // Format 3: YYYY-MM-DD (ISO)
+  const re3 = /(202\d)-(\d{2})-(\d{2})/g;
+  let m3;
+  while ((m3 = re3.exec(fullText)) !== null) {
+    const d = new Date(parseInt(m3[1]), parseInt(m3[2])-1, parseInt(m3[3]));
+    if (!isNaN(d)) dateCandidates.push({ d, score: 4 });
+  }
+
+  // Format 4: Month name (Mar 8, 2026)
+  const re4 = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/gi;
+  let m4;
+  while ((m4 = re4.exec(fullText)) !== null) {
+    const d = new Date(m4[0]);
+    if (!isNaN(d)) dateCandidates.push({ d, score: 2 });
+  }
+
+  // Pick highest scored valid candidate
+  // Filter out clearly wrong dates (future > 1 year, or before 2020)
+  const now = new Date();
+  const validCandidates = dateCandidates.filter(c => {
+    const yr = c.d.getFullYear();
+    return !isNaN(c.d) && yr >= 2020 && yr <= now.getFullYear() + 1;
+  });
+  if (validCandidates.length > 0) {
+    validCandidates.sort((a,b) => b.score - a.score);
+    STATE.scanned.date = validCandidates[0].d;
   }
 
   // ── Amount — find the total charge/refund on the receipt ──
@@ -1797,6 +1824,46 @@ function clearDateField() {
   document.getElementById('dateNextBtn').disabled = true;
   document.getElementById('dateHint').textContent = '';
   document.getElementById('dateHint').className = 'field-hint';
+}
+
+// Called on every keystroke — enable Continue if value looks like a date
+function handleDateInput(val) {
+  // Auto-insert slashes as user types: 03 -> 03/ -> 03/08 -> 03/08/
+  const digits = val.replace(/\D/g, '');
+  let formatted = digits;
+  if (digits.length > 2) formatted = digits.substring(0,2) + '/' + digits.substring(2);
+  if (digits.length > 4) formatted = digits.substring(0,2) + '/' + digits.substring(2,4) + '/' + digits.substring(4,8);
+  // Only update if different to avoid cursor jump
+  const input = document.getElementById('dateInput');
+  if (formatted !== val) { input.value = formatted; }
+  // Try to parse
+  parseDateInput(formatted);
+}
+
+// Parse typed date and update STATE + calendar
+function parseDateInput(val) {
+  const parts = val.split('/');
+  if (parts.length === 3) {
+    const mo = parseInt(parts[0]);
+    const dy = parseInt(parts[1]);
+    let yr = parseInt(parts[2]);
+    if (yr < 100) yr += 2000;
+    if (mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31 && yr >= 2020 && yr <= 2035) {
+      const d = new Date(yr, mo-1, dy);
+      if (!isNaN(d)) {
+        STATE.date = d;
+        STATE.calYear = yr;
+        STATE.calMonth = mo - 1;
+        renderCalendar();
+        document.getElementById('dateNextBtn').disabled = false;
+        return;
+      }
+    }
+  }
+  // Not a valid date yet — disable Continue but don't clear calendar
+  if (val.length > 0) {
+    document.getElementById('dateNextBtn').disabled = true;
+  }
 }
 
 function calNav(dir) {
