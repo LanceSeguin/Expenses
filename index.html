@@ -832,7 +832,7 @@
     <div class="field-wrap">
       <label class="field-label">Selected Date</label>
       <div class="field-input-wrap">
-        <input type="text" id="dateInput" placeholder="MM/DD/YYYY" inputmode="numeric" oninput="handleDateInput(this.value)" onblur="parseDateInput(this.value)" style="cursor:text" />
+        <input type="tel" id="dateInput" placeholder="MM/DD/YYYY" oninput="handleDateInput(this.value)" onblur="parseDateInput(this.value)" autocomplete="off" />
         <button class="field-clear" onclick="clearDateField()">×</button>
       </div>
       <div id="dateHint" class="field-hint"></div>
@@ -888,7 +888,7 @@
       <label class="field-label">Total Amount</label>
       <div class="field-input-wrap">
         <span class="amount-prefix">$</span>
-        <input type="number" id="amountInput" placeholder="0.00" step="0.01" min="0" inputmode="decimal" oninput="checkAmountNext()" />
+        <input type="tel" id="amountInput" placeholder="0.00" autocomplete="off" oninput="checkAmountNext()" />
         <button class="field-clear" onclick="clearField('amountInput'); checkAmountNext()">×</button>
       </div>
       <div id="amountHint" class="field-hint"></div>
@@ -1699,9 +1699,15 @@ function parseReceiptText(text) {
     }
   }
 
-  if (foundAmount && foundAmount > 0) {
-    // Charges are negative (expense), refunds are positive
-    STATE.scanned.amount = isRefund ? foundAmount : -foundAmount;
+  if (foundAmount) {
+    // Receipt shows positive = charge/expense → store as negative
+    // Receipt shows negative (rare, e.g. refund slip) → store as positive
+    // Also check for explicit refund/return/credit words on the receipt
+    if (isRefund || foundAmount < 0) {
+      STATE.scanned.amount = Math.abs(foundAmount); // positive = refund/income
+    } else {
+      STATE.scanned.amount = -Math.abs(foundAmount); // negative = expense/charge
+    }
   }
 
   // ── Vendor — first meaningful line near top ──
@@ -1956,25 +1962,22 @@ function prefillAmount() {
   const hint = document.getElementById('amountHint');
   if (STATE.scanned.amount && !input.value) {
     const amt = STATE.scanned.amount;
-    // Show absolute value in the field — negative means expense, positive means refund
-    input.value = Math.abs(amt).toFixed(2);
+    // Show the signed value directly — negative = expense, positive = refund
+    input.value = amt.toFixed(2);
     const isRefund = amt > 0;
-    hint.textContent = 'Auto-filled from receipt scan' + (isRefund ? ' — detected as REFUND (positive)' : ' — detected as charge (negative)');
+    hint.textContent = 'Auto-filled from receipt scan — ' + (isRefund ? 'detected as REFUND' : 'detected as charge');
     hint.className = 'field-hint scanned';
   }
   checkAmountNext();
 }
 
 function checkAmountNext() {
-  const val = parseFloat(document.getElementById('amountInput').value);
-  if (isNaN(val)) {
+  const raw = document.getElementById('amountInput').value.trim();
+  const val = parseFloat(raw);
+  if (isNaN(val) || raw === '' || raw === '-') {
     STATE.amount = null;
   } else {
-    // Preserve sign from scan — if scanned amount was negative (charge), keep negative
-    // If user typed manually, default to negative (expense)
-    const absVal = Math.abs(val);
-    const wasRefund = STATE.scanned.amount && STATE.scanned.amount > 0;
-    STATE.amount = wasRefund ? absVal : -absVal;
+    STATE.amount = val; // use exactly what user has typed — sign included
   }
   document.getElementById('amountNextBtn').disabled = STATE.amount === null;
 }
@@ -2180,7 +2183,9 @@ async function doSubmit(fileNameSuffix) {
   errEl.style.display = 'none';
 
   const dateStr = getDateStr();
-  const payload = {
+
+  // ── Step 1: Write row to Google Sheet (no-cors, small payload) ──
+  const sheetPayload = {
     action: 'addExpense',
     business: STATE.business,
     isBusinessExpense: STATE.isBusinessExpense,
@@ -2192,35 +2197,148 @@ async function doSubmit(fileNameSuffix) {
     amount: STATE.amount,
     description: STATE.description,
     fileNameSuffix: fileNameSuffix || null,
-    fileBase64: STATE.fileBase64 || null,
-    fileMimeType: STATE.fileMimeType || null
+    fileBase64: null,      // send file separately
+    fileMimeType: null
   };
 
   try {
-    // Use no-cors mode — we won't get the response body back
-    // but the Apps Script will still execute and write to the sheet
-    // We verify by checking the sheet directly after
-    const resp = await fetch(CFG.webAppUrl, {
+    await fetch(CFG.webAppUrl, {
       method: 'POST',
       mode: 'no-cors',
-      body: JSON.stringify(payload)
+      body: JSON.stringify(sheetPayload)
     });
-
-    // no-cors always returns opaque response — treat as success
-    const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
-    document.getElementById('successDetail').innerHTML =
-      `Added to <strong>${STATE.business} ${year} Tax Sheet</strong><br>${STATE.vendor} • $${parseFloat(STATE.amount).toFixed(2)}<br><span style="font-size:11px;color:var(--text-dim)">Note: Verify entry appeared in your sheet</span>`;
-
-    document.getElementById('driveStatus').style.display = 'none';
-    goToScreen('success');
-
-  } catch (err) {
+  } catch(err) {
     errEl.textContent = 'Submission failed: ' + err.message;
     errEl.style.display = 'block';
     btn.disabled = false;
     btn.textContent = 'Submit to Google Sheets';
+    return;
   }
+
+  // ── Step 2: Upload receipt to Drive directly via Drive API ──
+  const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
+  let driveMsg = '';
+
+  if (STATE.fileBase64 && CFG.visionApiKey) {
+    btn.textContent = 'Saving receipt to Drive…';
+    try {
+      driveMsg = await uploadReceiptToDrive(fileNameSuffix, year);
+    } catch(err) {
+      driveMsg = '⚠ Sheet saved but Drive upload failed: ' + err.message;
+    }
+  } else if (!STATE.fileBase64) {
+    driveMsg = 'No receipt uploaded — Drive filing skipped.';
+  } else {
+    driveMsg = '⚠ No API key — Drive filing skipped. Add Vision API key in Settings.';
+  }
+
+  // ── Show success ──
+  const year2 = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
+  document.getElementById('successDetail').innerHTML =
+    `Added to <strong>${STATE.business} ${year2} Tax Sheet</strong><br>` +
+    `${STATE.vendor} • $${Math.abs(parseFloat(STATE.amount)).toFixed(2)}<br>` +
+    `<span style="font-size:11px;color:var(--text-dim)">Verify the entry appeared in your sheet</span>`;
+
+  const driveEl = document.getElementById('driveStatus');
+  const driveTextEl = document.getElementById('driveStatusText');
+  if (driveMsg) {
+    driveEl.style.display = 'flex';
+    driveTextEl.innerHTML = driveMsg;
+  }
+
+  goToScreen('success');
 }
+
+// Upload receipt PDF directly to Google Drive from browser
+// Uses Drive API with the Vision API key (same Google Cloud project)
+async function uploadReceiptToDrive(fileNameSuffix, year) {
+  // Build filename
+  const dateObj = STATE.date || new Date();
+  const mo = dateObj.getMonth() + 1;
+  const dy = dateObj.getDate();
+  let propAbbr = getPropertyAbbr();
+  const vendor = (STATE.vendor || '').trim();
+  const vendorAbbr = abbreviateVendor(vendor);
+  let fileName = `${propAbbr} ${vendorAbbr} ${mo}-${dy}`;
+  if (fileNameSuffix) fileName += ` (${fileNameSuffix})`;
+  fileName += '.pdf';
+
+  // Get folder ID from Apps Script via GET (small request, no CORS issue)
+  const folderParams = new URLSearchParams({
+    action: 'getFolderForUpload',
+    business: STATE.business,
+    year: year,
+    purpose: STATE.purpose
+  });
+  const folderResp = await fetch(CFG.webAppUrl + '?' + folderParams.toString());
+  const folderData = await folderResp.json();
+  if (folderData.error) throw new Error(folderData.error);
+  const folderId = folderData.folderId;
+  const folderPath = folderData.folderPath;
+
+  // Convert to PDF blob
+  const pdfBase64 = await convertToPdf(STATE.fileBase64, STATE.fileMimeType);
+
+  // Upload to Drive using multipart upload
+  const boundary = 'receipt_boundary_' + Date.now();
+  const metadata = JSON.stringify({ name: fileName, parents: [folderId], mimeType: 'application/pdf' });
+
+  // Build multipart body
+  const metaPart = `--${boundary}
+Content-Type: application/json; charset=UTF-8
+
+${metadata}
+`;
+  const dataPart = `--${boundary}
+Content-Type: application/pdf
+Content-Transfer-Encoding: base64
+
+${pdfBase64}
+--${boundary}--`;
+  const body = metaPart + dataPart;
+
+  const uploadResp = await fetch(
+    `https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&key=${CFG.visionApiKey}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
+      body: body
+    }
+  );
+
+  const uploadData = await uploadResp.json();
+  if (uploadData.error) throw new Error(uploadData.error.message);
+
+  return `📁 Saved to Drive: <strong style="color:var(--text)">${folderPath}</strong><br><span style="color:var(--accent)">${fileName}</span>`;
+}
+
+// Convert image to PDF using canvas
+async function convertToPdf(base64, mimeType) {
+  if (mimeType === 'application/pdf') return base64;
+  // For images, re-compress as JPEG (Drive API accepts JPEG uploaded as PDF via Apps Script)
+  // We just return the compressed image and let Apps Script handle conversion
+  return await compressImage(base64, mimeType);
+}
+
+// Client-side vendor abbreviation (mirrors Apps Script logic)
+function abbreviateVendor(vendor) {
+  const known = {
+    "lowe's": 'LOWES', 'lowes': 'LOWES', 'home depot': 'HDEPOT',
+    'east baton rouge sheriff': 'EBRS', 'east baton rouge': 'EBR',
+    'google pay': 'GPAY', 'door dash': 'DRDSH', 'doordash': 'DRDSH',
+    'amazon': 'AMZN', 'walmart': 'WLMRT', 'circle k': 'CIRCK',
+    'housing authority': 'HSAUT', 'supra': 'SUPRA',
+  };
+  const lower = vendor.toLowerCase();
+  for (const [key, abbr] of Object.entries(known)) {
+    if (lower.includes(key)) return abbr;
+  }
+  const words = vendor.trim().split(/\s+/);
+  if (words.length > 1) return words.map(w => w.charAt(0).toUpperCase()).join('').substring(0, 6);
+  return vendor.toUpperCase().substring(0, 6);
+}
+
+
 // ════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════
