@@ -1171,6 +1171,12 @@ window.onerror = function(msg, src, line, col, err) {
   return true;
 };
 // ════════════════════════════════════════════
+// HARDCODED CONFIG — shared for all users
+// ════════════════════════════════════════════
+const HARDCODED_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzunFqBMn82NpK9Y3R8hO9LBJb3SHLh4VgXKMAe4DNqAvkXyBRBSlZzh-uy7CcH---0ew/exec';
+const HARDCODED_VISION_KEY  = 'AIzaSyANA15O0FPREaFOIN5xXszhXlXHapP9Q0Y';
+
+// ════════════════════════════════════════════
 // DEFAULTS
 // ════════════════════════════════════════════
 const DEFAULTS = {
@@ -1203,10 +1209,21 @@ function saveConfigToStorage(cfg) {
 
 function getConfig() {
   const stored = loadConfig();
-  if (stored) return stored;
-  // First time — use defaults
+  if (stored) {
+    // Always apply hardcoded values if stored ones are empty
+    // This means existing users also get the URL/key without re-entering
+    if (!stored.webAppUrl && HARDCODED_WEB_APP_URL && !HARDCODED_WEB_APP_URL.includes('PASTE_')) {
+      stored.webAppUrl = HARDCODED_WEB_APP_URL;
+    }
+    if (!stored.visionApiKey && HARDCODED_VISION_KEY) {
+      stored.visionApiKey = HARDCODED_VISION_KEY;
+    }
+    return stored;
+  }
+  // First time — use hardcoded values so no setup screen needed
   return {
-    webAppUrl: localStorage.getItem('webAppUrl') || '',
+    webAppUrl: HARDCODED_WEB_APP_URL.includes('PASTE_') ? '' : HARDCODED_WEB_APP_URL,
+    visionApiKey: HARDCODED_VISION_KEY,
     LNI: { cards: [...DEFAULTS.LNI.cards], props: [...DEFAULTS.LNI.props] },
     LNEP: { cards: [...DEFAULTS.LNEP.cards], props: [...DEFAULTS.LNEP.props] }
   };
@@ -2389,7 +2406,18 @@ window.addEventListener('DOMContentLoaded', () => {
   renderCalendar();
   updateBusinessSubtitles();
 
+  // Apply hardcoded values if not already set
+  if (HARDCODED_WEB_APP_URL && !HARDCODED_WEB_APP_URL.includes('PASTE_') && !CFG.webAppUrl) {
+    CFG.webAppUrl = HARDCODED_WEB_APP_URL;
+    persistCFG();
+  }
+  if (HARDCODED_VISION_KEY && !CFG.visionApiKey) {
+    CFG.visionApiKey = HARDCODED_VISION_KEY;
+    persistCFG();
+  }
+
   if (!CFG.webAppUrl) {
+    // No URL set and no hardcoded value — show setup screen
     document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
     document.getElementById('screen-config').classList.add('active');
     document.getElementById('progressFill').style.width = '0%';
