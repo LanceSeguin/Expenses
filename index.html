@@ -1702,13 +1702,12 @@ function parseReceiptText(text) {
   }
 
   if (foundAmount) {
-    // Receipt shows positive = charge/expense → store as negative
-    // Receipt shows negative (rare, e.g. refund slip) → store as positive
-    // Also check for explicit refund/return/credit words on the receipt
-    if (isRefund || foundAmount < 0) {
-      STATE.scanned.amount = Math.abs(foundAmount); // positive = refund/income
+    // Default: positive on receipt = expense = NEGATIVE in sheet
+    // Only treat as refund/positive if receipt explicitly says refund/return/credit
+    if (isRefund) {
+      STATE.scanned.amount = Math.abs(foundAmount); // refund = positive
     } else {
-      STATE.scanned.amount = -Math.abs(foundAmount); // negative = expense/charge
+      STATE.scanned.amount = -Math.abs(foundAmount); // charge = negative (regardless of sign on receipt)
     }
   }
 
@@ -1965,9 +1964,9 @@ function prefillAmount() {
   if (STATE.scanned.amount && !input.value) {
     const amt = STATE.scanned.amount;
     const isRefund = amt > 0;
-    // Show absolute value in field — sign shown by toggle button
-    input.value = Math.abs(amt).toFixed(2);
     updateSignToggle(isRefund ? '+' : '-');
+    // Show signed value in field so user sees exactly what will be entered
+    input.value = amt.toFixed(2);
     hint.textContent = 'Auto-filled from receipt scan — ' + (isRefund ? 'detected as REFUND (+)' : 'detected as charge (−)');
     hint.className = 'field-hint scanned';
   }
@@ -1991,20 +1990,25 @@ function updateSignToggle(sign) {
 function toggleAmountSign() {
   const btn = document.getElementById('signToggleBtn');
   const current = btn.dataset.sign || '-';
-  updateSignToggle(current === '-' ? '+' : '-');
+  const newSign = current === '-' ? '+' : '-';
+  updateSignToggle(newSign);
+  // Flip the value in the text box too
+  const input = document.getElementById('amountInput');
+  const raw = parseFloat(input.value);
+  if (!isNaN(raw)) {
+    input.value = newSign === '-' ? -Math.abs(raw) : Math.abs(raw);
+    input.value = parseFloat(input.value).toFixed(2);
+  }
   checkAmountNext();
 }
 
 function checkAmountNext() {
   const raw = document.getElementById('amountInput').value.trim();
-  const absVal = parseFloat(raw);
-  if (isNaN(absVal) || raw === '') {
+  const val = parseFloat(raw);
+  if (isNaN(val) || raw === '' || raw === '-' || raw === '+') {
     STATE.amount = null;
   } else {
-    // Apply sign from toggle button
-    const btn = document.getElementById('signToggleBtn');
-    const sign = btn ? (btn.dataset.sign || '-') : '-';
-    STATE.amount = sign === '+' ? Math.abs(absVal) : -Math.abs(absVal);
+    STATE.amount = val; // value in box is already signed correctly
   }
   document.getElementById('amountNextBtn').disabled = STATE.amount === null;
 }
@@ -2030,7 +2034,7 @@ function updateDescCount() {
 // SUMMARY
 // ════════════════════════════════════════════
 function buildSummary() {
-  const amt = STATE.amount ? `$${parseFloat(STATE.amount).toFixed(2)}` : '—';
+  const amt = STATE.amount !== null ? `$${parseFloat(STATE.amount).toFixed(2)}` : '—';
   const dateStr = STATE.date ? `${STATE.date.getMonth()+1}/${STATE.date.getDate()}/${STATE.date.getFullYear()}` : '—';
   const bizName = BUSINESS_NAMES[STATE.business] || '—';
   const propName = STATE.isBusinessExpense ? bizName : (STATE.property || '—');
@@ -2265,14 +2269,43 @@ async function doSubmit(fileNameSuffix) {
         fileNameSuffix: fileNameSuffix || null
       };
 
-      // Use no-cors — Drive will still save even though we cant read the response
-      await fetch(CFG.webAppUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        body: JSON.stringify(drivePayload)
+      // First get folder path so we can show user exactly where it should appear
+      // Use GET request (not blocked by CORS) to get folder info
+      const folderParams = new URLSearchParams({
+        action: 'getFolderForUpload',
+        business: STATE.business,
+        year: year,
+        purpose: STATE.purpose
       });
+      let folderPath = 'unknown folder';
+      try {
+        const folderResp = await fetch(CFG.webAppUrl + '?' + folderParams.toString());
+        const folderData = await folderResp.json();
+        if (folderData.folderPath) folderPath = folderData.folderPath;
+      } catch(e) { /* non-fatal */ }
 
-      driveMsg = '📁 Receipt sent to Drive — check your folder to confirm it saved.';
+      // Send file via regular POST (same origin rules as sheet submit)
+      // Use regular fetch so we can read success/error response
+      let driveRespData = null;
+      try {
+        const driveResp = await fetch(CFG.webAppUrl, {
+          method: 'POST',
+          body: JSON.stringify(drivePayload)
+        });
+        driveRespData = await driveResp.json();
+      } catch(fetchErr) {
+        // If CORS blocks reading response, fall back to no-cors
+        await fetch(CFG.webAppUrl, {
+          method: 'POST',
+          mode: 'no-cors',
+          body: JSON.stringify(drivePayload)
+        });
+      }
+      if (driveRespData && driveRespData.error) {
+        throw new Error(driveRespData.error);
+      }
+
+      driveMsg = '📁 Receipt sent to: <strong style="color:var(--text)">' + folderPath + '</strong><br><span style="font-size:11px;color:var(--text-muted)">Check that folder in Google Drive to confirm the file saved.</span>';
     } catch(err) {
       driveMsg = '⚠ Sheet saved but Drive upload failed: ' + err.message;
     }
