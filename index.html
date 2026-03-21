@@ -84,6 +84,15 @@
   }
   .settings-btn:hover { border-color: var(--accent); color: var(--accent); }
   .settings-btn svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.8; }
+  .version-badge {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.04em;
+    margin-left: 6px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    font-weight: 400;
+    vertical-align: middle;
+  }
 
   /* ── Progress Bar ── */
   .progress-wrap { padding: 16px 20px 0; }
@@ -699,7 +708,7 @@
 
   <!-- Top Bar -->
   <div class="topbar">
-    <div class="topbar-logo">Expense Entry</div>
+    <div class="topbar-logo">Expense Entry<span class="version-badge">v1.0.0</span></div>
     <div class="topbar-right">
       <div class="topbar-step" id="stepLabel"></div>
       <button class="settings-btn" id="settingsOpenBtn" onclick="openSettings()" title="Configure cards & properties" style="display:none">
