@@ -1246,6 +1246,28 @@
 
     <div class="sett-divider"></div>
 
+    <!-- ── Store Name Helpers ── -->
+    <div class="sett-section">
+      <div class="sett-section-header">
+        <div class="sett-section-icon">🏪</div>
+        <div>
+          <div class="sett-section-title">Store Name Helpers</div>
+          <div class="sett-section-sub">Teach the scanner to recognize stores by receipt text</div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:10px;line-height:1.5">
+        Enter a word or phrase that appears on the receipt (e.g. <em>sherwin</em>) and the clean name to fill in (e.g. <em>Sherwin-Williams</em>). Your helpers are checked before the built-in list.
+      </div>
+      <div id="storeHelperList" style="margin-bottom:10px"></div>
+      <div class="add-row" style="gap:6px">
+        <input class="add-input" type="text" id="storeHelperKw" placeholder="Keyword on receipt" style="flex:2" onkeydown="if(event.key==='Enter') addStoreHelper()" />
+        <input class="add-input" type="text" id="storeHelperName" placeholder="Store name" style="flex:2" onkeydown="if(event.key==='Enter') addStoreHelper()" />
+        <button class="add-btn" onclick="addStoreHelper()">Add</button>
+      </div>
+    </div>
+
+    <div class="sett-divider"></div>
+
     <!-- ── Reset to Defaults ── -->
     <div class="sett-section">
       <div class="sett-section-header">
@@ -1298,6 +1320,85 @@ const DEFAULTS = {
 };
 
 const BUSINESS_NAMES = { LNI: 'LN Investments', LNEP: 'LNE Properties' };
+
+// ════════════════════════════════════════════
+// STORE HELPERS — keyword → clean store name
+// ════════════════════════════════════════════
+// Scans the full OCR text for any matching keyword.
+// Runs before the generic first-line heuristic so messy receipts still resolve correctly.
+// User-added helpers (stored in CFG.storeHelpers) are checked first and take priority.
+const BUILTIN_STORE_HELPERS = [
+  // ── Hardware / Home Improvement ──
+  { keywords: ["lowe's", "lowes", "lowe\u2019s", "lowe&#x27;s"], name: "Lowe's" },
+  { keywords: ['home depot'],                                      name: 'Home Depot' },
+  { keywords: ['harbor freight'],                                  name: 'Harbor Freight' },
+  { keywords: ['ace hardware'],                                    name: 'Ace Hardware' },
+  { keywords: ['true value'],                                      name: 'True Value' },
+  { keywords: ['sherwin-williams', 'sherwin williams'],            name: 'Sherwin-Williams' },
+  { keywords: ['menards'],                                         name: 'Menards' },
+  { keywords: ['fastenal'],                                        name: 'Fastenal' },
+  // ── Big Box / Grocery ──
+  { keywords: ['walmart', 'wal-mart'],                             name: 'Walmart' },
+  { keywords: ['costco'],                                          name: 'Costco' },
+  { keywords: ["sam's club", 'sams club'],                         name: "Sam's Club" },
+  { keywords: ['target'],                                          name: 'Target' },
+  { keywords: ['dollar general'],                                  name: 'Dollar General' },
+  { keywords: ['dollar tree'],                                     name: 'Dollar Tree' },
+  { keywords: ['family dollar'],                                   name: 'Family Dollar' },
+  { keywords: ['publix'],                                          name: 'Publix' },
+  { keywords: ['winn-dixie', 'winn dixie'],                        name: 'Winn-Dixie' },
+  { keywords: ['rouses'],                                          name: 'Rouses' },
+  { keywords: ['kroger'],                                          name: 'Kroger' },
+  // ── Online / Tech ──
+  { keywords: ['amazon'],                                          name: 'Amazon' },
+  { keywords: ['google pay', 'google.com'],                        name: 'Google Pay' },
+  { keywords: ['best buy'],                                        name: 'Best Buy' },
+  { keywords: ['office depot', 'officemax'],                       name: 'Office Depot' },
+  { keywords: ['staples'],                                         name: 'Staples' },
+  // ── Auto ──
+  { keywords: ['autozone', 'auto zone'],                           name: 'AutoZone' },
+  { keywords: ["o'reilly", 'oreilly', 'o\u2019reilly'],            name: "O'Reilly Auto" },
+  { keywords: ['napa auto'],                                       name: 'NAPA Auto' },
+  { keywords: ['advance auto'],                                    name: 'Advance Auto' },
+  { keywords: ['pep boys'],                                        name: 'Pep Boys' },
+  // ── Gas / Convenience ──
+  { keywords: ['circle k'],                                        name: 'Circle K' },
+  { keywords: ['shell'],                                           name: 'Shell' },
+  { keywords: ['chevron'],                                         name: 'Chevron' },
+  { keywords: ['exxon'],                                           name: 'ExxonMobil' },
+  { keywords: ['valero'],                                          name: 'Valero' },
+  { keywords: ['racetrac'],                                        name: 'RaceTrac' },
+  { keywords: ['murphy'],                                          name: 'Murphy USA' },
+  { keywords: ['quiktrip'],                                        name: 'QuikTrip' },
+  // ── Food / Delivery ──
+  { keywords: ['doordash', 'door dash'],                           name: 'DoorDash' },
+  { keywords: ['uber eats'],                                       name: 'Uber Eats' },
+  { keywords: ['grubhub'],                                         name: 'GrubHub' },
+  // ── Local / Business-specific ──
+  { keywords: ['east baton rouge sheriff', 'ebr sheriff'],         name: 'EBR Sheriff' },
+  { keywords: ['east baton rouge', 'ebr housing'],                 name: 'EBR Housing' },
+  { keywords: ['providence dubois'],                               name: 'Providence Dubois' },
+  { keywords: ['w group', 'wgroup'],                               name: 'W Group' },
+  { keywords: ['supra'],                                           name: 'Supra' },
+];
+
+// Returns a clean store name if any keyword matches the full OCR text, else null.
+function matchStoreHelper(ocrText) {
+  const lower = ocrText.toLowerCase();
+  // User-added helpers take priority over built-ins
+  const userHelpers = CFG.storeHelpers || [];
+  for (const h of userHelpers) {
+    for (const kw of h.keywords) {
+      if (lower.includes(kw.toLowerCase())) return h.name;
+    }
+  }
+  for (const h of BUILTIN_STORE_HELPERS) {
+    for (const kw of h.keywords) {
+      if (lower.includes(kw)) return h.name;
+    }
+  }
+  return null;
+}
 
 // ════════════════════════════════════════════
 // STORAGE HELPERS — load/save config
@@ -1372,6 +1473,7 @@ function openSettings() {
   renderTagList('LNI', 'props');
   renderTagList('LNEP', 'props');
   renderPropAbbrList();
+  renderStoreHelperList();
 
   const urlEl = document.getElementById('settWebAppUrl');
   if (urlEl) urlEl.value = CFG.webAppUrl || '';
@@ -1520,6 +1622,56 @@ function renderPropAbbrList() {
       </span>`;
     container.appendChild(row);
   });
+}
+
+// ════════════════════════════════════════════
+// STORE HELPER SETTINGS
+// ════════════════════════════════════════════
+function renderStoreHelperList() {
+  const container = document.getElementById('storeHelperList');
+  if (!container) return;
+  const helpers = CFG.storeHelpers || [];
+  if (!helpers.length) {
+    container.innerHTML = '<div class="tag-empty">No custom helpers — built-ins active</div>';
+    return;
+  }
+  container.innerHTML = '';
+  helpers.forEach((h, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;';
+    row.innerHTML = `
+      <span style="color:var(--text-muted);font-size:12px;flex:1">"${h.keywords[0]}"</span>
+      <span style="color:var(--accent);font-weight:700;flex:1">→ ${h.name}</span>
+      <button class="tag-remove" onclick="removeStoreHelper(${i})" title="Remove">×</button>`;
+    container.appendChild(row);
+  });
+}
+
+function addStoreHelper() {
+  const kwInput  = document.getElementById('storeHelperKw');
+  const nmInput  = document.getElementById('storeHelperName');
+  const kw   = kwInput.value.trim().toLowerCase();
+  const name = nmInput.value.trim();
+  if (!kw || !name) return;
+  if (!CFG.storeHelpers) CFG.storeHelpers = [];
+  // Prevent duplicate keyword
+  if (CFG.storeHelpers.some(h => h.keywords.includes(kw))) {
+    kwInput.style.borderColor = 'var(--accent)';
+    setTimeout(() => kwInput.style.borderColor = '', 1500);
+    return;
+  }
+  CFG.storeHelpers.push({ keywords: [kw], name });
+  persistCFG();
+  kwInput.value = '';
+  nmInput.value = '';
+  renderStoreHelperList();
+}
+
+function removeStoreHelper(index) {
+  if (!CFG.storeHelpers) return;
+  CFG.storeHelpers.splice(index, 1);
+  persistCFG();
+  renderStoreHelperList();
 }
 
 function confirmReset() {
@@ -1827,12 +1979,19 @@ function parseReceiptText(text) {
     STATE.scanned.amount = -Math.abs(foundAmount);
   }
 
-  // ── Vendor — first meaningful line near top ──
-  const skipWords = /receipt|invoice|total|tax|date|amount|thank|welcome|store|purchase|sign|track|rewards|manage|centers|llc|dr\.|baton|rouge|sale|trans|salesperson/i;
-  for (const line of lines.slice(0, 12)) {
-    if (line.length > 2 && line.length < 35 && !skipWords.test(line) && !/^\d/.test(line) && !/^\$/.test(line) && !/^\*/.test(line) && !/^-/.test(line)) {
-      STATE.scanned.vendor = line;
-      break;
+  // ── Vendor — store helper first, then first meaningful line near top ──
+  // matchStoreHelper scans the full OCR text for known store keywords,
+  // which is more reliable than guessing from the first line.
+  const helperMatch = matchStoreHelper(fullText);
+  if (helperMatch) {
+    STATE.scanned.vendor = helperMatch;
+  } else {
+    const skipWords = /receipt|invoice|total|tax|date|amount|thank|welcome|store|purchase|sign|track|rewards|manage|centers|llc|dr\.|baton|rouge|sale|trans|salesperson/i;
+    for (const line of lines.slice(0, 12)) {
+      if (line.length > 2 && line.length < 35 && !skipWords.test(line) && !/^\d/.test(line) && !/^\$/.test(line) && !/^\*/.test(line) && !/^-/.test(line)) {
+        STATE.scanned.vendor = line;
+        break;
+      }
     }
   }
 
