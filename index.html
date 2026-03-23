@@ -554,6 +554,37 @@
   }
   .config-field input:focus { border-color: var(--accent); }
 
+  /* ── Entry History — subtle session log ── */
+  .history-item {
+    background: transparent;
+    border-bottom: 1px solid var(--border);
+    padding: 6px 2px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+  }
+  .history-item:last-child { border-bottom: none; }
+  .history-item-left { flex: 1; min-width: 0; }
+  .history-item-title {
+    font-weight: 500;
+    color: var(--text-muted);
+    font-size: 12px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .history-item-sub { color: var(--text-dim); margin-top: 1px; font-size: 10px; }
+  .history-item-amount {
+    font-weight: 600;
+    font-size: 12px;
+    flex-shrink: 0;
+  }
+  .history-amount-neg { color: var(--danger); }
+  .history-amount-pos { color: var(--success); }
+  .history-confirmed { color: var(--success); font-size: 9px; }
+  .history-unconfirmed { color: var(--text-dim); font-size: 9px; }
+
   /* ── Property Total Badge ── */
   .prop-total-badge {
     font-size: 11px;
@@ -998,7 +1029,7 @@
   <!-- SCREEN 10: Success        -->
   <!-- ══════════════════════════ -->
   <div class="screen" id="screen-success">
-    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;padding-top:40px">
+    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;padding-top:24px">
       <div class="success-icon">✓</div>
       <div class="success-title">Entry Added!</div>
       <div class="success-sub">Your expense has been recorded in Google Sheets.</div>
@@ -1008,7 +1039,18 @@
         <div id="driveStatusText" style="font-size:12px; line-height:1.5"></div>
       </div>
     </div>
-    <button class="btn-primary" onclick="resetApp()" style="margin-top:auto">Add Another Expense</button>
+    <!-- Recent entries history — subtle session log -->
+    <div id="historyPanel" style="width:100%;margin-top:12px;display:none">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;padding:0 2px">
+        <span style="font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim)">Session Log</span>
+        <button onclick="clearHistory()" style="background:transparent;border:none;font-size:10px;color:var(--text-dim);cursor:pointer;padding:2px 4px;text-decoration:underline">Clear</button>
+      </div>
+      <div id="historyList" style="display:flex;flex-direction:column;gap:4px"></div>
+    </div>
+    <div style="margin-top:16px;display:flex;gap:10px">
+      <button class="btn-primary" onclick="resetApp()" style="margin-top:0">Add Another Expense</button>
+      <button class="btn-back" onclick="goToScreen('rent')" style="margin-top:0;width:auto;padding:14px 16px;border-color:var(--accent);color:var(--accent);white-space:nowrap">+ Rent</button>
+    </div>
   </div>
 
 
@@ -1277,6 +1319,41 @@
 
     <div class="sett-divider"></div>
 
+    <!-- ── Email Notifications ── -->
+    <div class="sett-section">
+      <div class="sett-section-header">
+        <div class="sett-section-icon">🔔</div>
+        <div>
+          <div class="sett-section-title">Email Notifications</div>
+          <div class="sett-section-sub">Get notified when an entry is added</div>
+        </div>
+      </div>
+      <div id="settNotifySuccess" class="success-msg" style="display:none">✓ Notification settings saved</div>
+
+      <!-- Email address -->
+      <div style="margin-bottom:10px">
+        <label class="field-label" style="margin-bottom:6px;display:block">Notify email address</label>
+        <div class="url-row">
+          <input class="url-input" type="email" id="settNotifyEmail" placeholder="you@example.com" />
+          <button class="url-save-btn" onclick="saveNotifySettings()">Save</button>
+        </div>
+      </div>
+
+      <!-- Toggles -->
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-muted)">
+          <input type="checkbox" id="notifyExpenses" style="width:16px;height:16px;accent-color:var(--accent)" onchange="saveNotifySettings()" />
+          Notify on expense entries
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-muted)">
+          <input type="checkbox" id="notifyRent" style="width:16px;height:16px;accent-color:var(--accent)" onchange="saveNotifySettings()" />
+          Notify on rent entries
+        </label>
+      </div>
+    </div>
+
+    <div class="sett-divider"></div>
+
     <!-- ── Reset to Defaults ── -->
     <div class="sett-section">
       <div class="sett-section-header">
@@ -1483,6 +1560,7 @@ function openSettings() {
   renderTagList('LNEP', 'props');
   renderPropAbbrList();
   renderStoreHelperList();
+  loadNotifySettings();
 
   const urlEl = document.getElementById('settWebAppUrl');
   if (urlEl) urlEl.value = CFG.webAppUrl || '';
@@ -1578,6 +1656,27 @@ function saveVisionKey() {
   persistCFG();
   document.getElementById('settVisionSuccess').style.display = 'flex';
   setTimeout(() => document.getElementById('settVisionSuccess').style.display = 'none', 2500);
+}
+
+function saveNotifySettings() {
+  const email = document.getElementById('settNotifyEmail').value.trim();
+  const notifyExpenses = document.getElementById('notifyExpenses').checked;
+  const notifyRent = document.getElementById('notifyRent').checked;
+  CFG.notifyEmail = email;
+  CFG.notifyExpenses = notifyExpenses;
+  CFG.notifyRent = notifyRent;
+  persistCFG();
+  const s = document.getElementById('settNotifySuccess');
+  if (s) { s.style.display = 'flex'; setTimeout(() => s.style.display = 'none', 2000); }
+}
+
+function loadNotifySettings() {
+  const emailEl = document.getElementById('settNotifyEmail');
+  const expEl = document.getElementById('notifyExpenses');
+  const rentEl = document.getElementById('notifyRent');
+  if (emailEl) emailEl.value = CFG.notifyEmail || '';
+  if (expEl) expEl.checked = CFG.notifyExpenses || false;
+  if (rentEl) rentEl.checked = CFG.notifyRent || false;
 }
 
 function saveUrlFromSettings() {
@@ -1737,6 +1836,7 @@ function goToScreen(name) {
   if (name === 'rent') { setTimeout(loadRentScreen, 50); }
   if (name === 'purpose') loadCategories();
   if (name === 'summary') buildSummary();
+  if (name === 'success') renderHistory();
 
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + name);
@@ -2524,15 +2624,44 @@ async function doSubmit(fileNameSuffix) {
     purpose: STATE.purpose,
     amount: STATE.amount,
     description: STATE.description,
-    fileNameSuffix: fileNameSuffix || null
+    fileNameSuffix: fileNameSuffix || null,
+    notifyEmail: (CFG.notifyExpenses && CFG.notifyEmail) ? CFG.notifyEmail : null,
+    entryType: 'expense'
   };
 
   try {
-    await fetch(CFG.webAppUrl, {
-      method: 'POST',
-      mode: 'no-cors',
-      body: JSON.stringify(sheetPayload)
-    });
+    // Try regular fetch first so we get a confirmation response
+    let sheetSaved = false;
+    try {
+      const sheetResp = await fetch(CFG.webAppUrl, {
+        method: 'POST',
+        body: JSON.stringify(sheetPayload)
+      });
+      const sheetData = await sheetResp.json();
+      if (sheetData.error) throw new Error(sheetData.error);
+      sheetSaved = true;
+      // Store confirmed entry in history
+      addToHistory({
+        type: 'expense',
+        business: STATE.business,
+        property: STATE.isBusinessExpense ? (STATE.business === 'LNI' ? 'LN Investments' : 'LNE Properties') : STATE.property,
+        vendor: STATE.vendor,
+        date: dateStr,
+        purpose: STATE.purpose,
+        amount: STATE.amount,
+        description: STATE.description,
+        row: sheetData.row,
+        tab: sheetData.tab,
+        timestamp: new Date().toISOString()
+      });
+    } catch(fetchErr) {
+      // Fall back to no-cors — will save but no confirmation
+      await fetch(CFG.webAppUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        body: JSON.stringify(sheetPayload)
+      });
+    }
   } catch(err) {
     errEl.textContent = 'Submission failed: ' + err.message;
     errEl.style.display = 'block';
@@ -2650,6 +2779,64 @@ function abbreviateVendor(vendor) {
   return vendor.toUpperCase().substring(0, 6);
 }
 
+
+// ════════════════════════════════════════════
+// ENTRY HISTORY (session only)
+// ════════════════════════════════════════════
+const SESSION_HISTORY = [];
+
+function addToHistory(entry) {
+  SESSION_HISTORY.unshift(entry); // newest first
+  renderHistory();
+}
+
+function clearHistory() {
+  SESSION_HISTORY.length = 0;
+  renderHistory();
+}
+
+function renderHistory() {
+  const list = document.getElementById('historyList');
+  const panel = document.getElementById('historyPanel');
+  if (!list || !panel) return;
+
+  if (SESSION_HISTORY.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.style.display = 'block';
+  list.innerHTML = '';
+
+  SESSION_HISTORY.forEach(e => {
+    const amt = parseFloat(e.amount) || 0;
+    const amtFmt = (amt >= 0 ? '+' : '-') + '$' + Math.abs(amt).toFixed(2);
+    const amtClass = amt >= 0 ? 'history-amount-pos' : 'history-amount-neg';
+    const confirmed = e.row ? '✓ row ' + e.row : '~ unconfirmed';
+    const confirmedClass = e.row ? 'history-confirmed' : 'history-unconfirmed';
+    const typeIcon = e.type === 'rent' ? '🏠' : '🧾';
+    const name = e.vendor || e.tenantName || '—';
+    const sub = [e.property, e.purpose || 'Rent', formatHistoryDate(e.date)].filter(Boolean).join(' · ');
+
+    const item = document.createElement('div');
+    item.className = 'history-item';
+    item.innerHTML =
+      `<span style="font-size:13px;flex-shrink:0;opacity:0.6">${typeIcon}</span>` +
+      `<div class="history-item-left">` +
+        `<div class="history-item-title">${name}</div>` +
+        `<div class="history-item-sub">${sub} <span class="${confirmedClass}">${confirmed}</span></div>` +
+      `</div>` +
+      `<div class="history-item-amount ${amtClass}">${amtFmt}</div>`;
+    list.appendChild(item);
+  });
+}
+
+function formatHistoryDate(dateStr) {
+  if (!dateStr) return '';
+  const parts = dateStr.split('-');
+  if (parts.length === 3) return parseInt(parts[1]) + '/' + parseInt(parts[2]);
+  return dateStr;
+}
 
 // ════════════════════════════════════════════
 // RENT ENTRY
@@ -2923,7 +3110,9 @@ async function submitRent() {
     tenantName: t.name,
     date: dateStr,
     amount: amount,
-    description: desc
+    description: desc,
+    notifyEmail: (CFG.notifyRent && CFG.notifyEmail) ? CFG.notifyEmail : null,
+    entryType: 'rent'
   };
 
   try {
@@ -2931,6 +3120,19 @@ async function submitRent() {
       method: 'POST',
       mode: 'no-cors',
       body: JSON.stringify(payload)
+    });
+
+    // Add to history
+    addToHistory({
+      type: 'rent',
+      tenantName: t.name,
+      property: property,
+      business: business,
+      purpose: 'Rent',
+      amount: amount,
+      description: desc,
+      date: dateStr,
+      timestamp: new Date().toISOString()
     });
 
     // Reset and show success
@@ -3023,6 +3225,7 @@ function resetApp() {
   document.getElementById('descInput').value = '';
   document.getElementById('purposeGrid').innerHTML = '';
   document.getElementById('purposeGrid').dataset.loadedFor = '';
+  propertyTotalsCache = null; // force reload next time
   document.getElementById('purposeNextBtn').disabled = true;
   document.getElementById('submitError').style.display = 'none';
   document.getElementById('driveStatus').style.display = 'none';
