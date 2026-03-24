@@ -3214,14 +3214,29 @@ function clearField(id) {
 }
 
 function resetApp() {
-  STATE.fileBase64 = null; STATE.fileMimeType = null; STATE.scanned = {};
-  STATE.business = null; STATE.isBusinessExpense = false; STATE.property = null;
-  STATE.vendor = ''; STATE.date = null; STATE.purpose = null; STATE.amount = null; STATE.description = '';
+  // 1. Clear all data state
+  STATE.fileBase64 = null; 
+  STATE.fileMimeType = null; 
+  STATE.scanned = {};
+  STATE.business = null; 
+  STATE.isBusinessExpense = false; 
+  STATE.property = null;
+  STATE.vendor = ''; 
+  STATE.date = null; 
+  STATE.purpose = null; 
+  STATE.amount = null; 
+  STATE.description = '';
+  
+  // 2. Clear UI elements
   document.getElementById('previewArea').style.display = 'none';
   document.getElementById('uploadZone').style.display = 'flex';
   document.getElementById('uploadNextBtn').disabled = true;
+  
+  // CRITICAL: Reset the actual file input values or the browser won't trigger 
+  // the 'change' event if you take a second photo with the same filename.
   document.getElementById('fileInputCamera').value = '';
   document.getElementById('fileInputPicker').value = '';
+  
   document.getElementById('businessNextBtn').disabled = true;
   document.querySelectorAll('.checkbox-card').forEach(c => c.classList.remove('selected'));
   document.querySelectorAll('.cb-badge').forEach(b => b.style.display = 'none');
@@ -3233,13 +3248,20 @@ function resetApp() {
   document.getElementById('amountInput').value = '';
   updateSignToggle('-');
   document.getElementById('descInput').value = '';
+  
+  // 3. Reset Categories and Totals Cache
   document.getElementById('purposeGrid').innerHTML = '';
   document.getElementById('purposeGrid').dataset.loadedFor = '';
-  propertyTotalsCache = null; // force reload next time
-  document.getElementById('purposeNextBtn').disabled = true;
+  propertyTotalsCache = null; 
+  
+  // 4. Reset Submit Button UI
+  const submitBtn = document.getElementById('submitBtn');
+  if (submitBtn) {
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit to Google Sheets';
+  }
+  
   document.getElementById('submitError').style.display = 'none';
-  document.getElementById('driveStatus').style.display = 'none';
-  document.getElementById('driveStatusText').innerHTML = '';
   goToScreen('upload');
 }
 
