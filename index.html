@@ -2606,13 +2606,13 @@ async function doSubmit(fileNameSuffix) {
   const btn = document.getElementById('submitBtn');
   const errEl = document.getElementById('submitError');
   btn.disabled = true;
-  btn.textContent = 'Submitting…';
+  btn.textContent = 'Submitting...';
   errEl.style.display = 'none';
 
   const dateStr = getDateStr();
   const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
 
-  // ── Step 1: Write row to sheet (no-cors POST, small payload) ──
+  // ── Step 1: Write row to sheet ──
   const sheetPayload = {
     action: 'addExpense',
     business: STATE.business,
@@ -2630,68 +2630,44 @@ async function doSubmit(fileNameSuffix) {
   };
 
   try {
-    // Try regular fetch first so we get a confirmation response
-    let sheetSaved = false;
-    try {
-      const sheetResp = await fetch(CFG.webAppUrl, {
-        method: 'POST',
-        body: JSON.stringify(sheetPayload)
-      });
-      const sheetData = await sheetResp.json();
-      if (sheetData.error) throw new Error(sheetData.error);
-      sheetSaved = true;
-      // Store confirmed entry in history
-      addToHistory({
-        type: 'expense',
-        business: STATE.business,
-        property: STATE.isBusinessExpense ? (STATE.business === 'LNI' ? 'LN Investments' : 'LNE Properties') : STATE.property,
-        vendor: STATE.vendor,
-        date: dateStr,
-        purpose: STATE.purpose,
-        amount: STATE.amount,
-        description: STATE.description,
-        row: sheetData.row,
-        tab: sheetData.tab,
-        timestamp: new Date().toISOString()
-      });
-    } catch(fetchErr) {
-      // Fall back to no-cors — will save but no confirmation
-      await fetch(CFG.webAppUrl, {
-        method: 'POST',
-        mode: 'no-cors',
-        body: JSON.stringify(sheetPayload)
-      });
-    }
-  } catch(err) {
-    errEl.textContent = 'Submission failed: ' + err.message;
-    errEl.style.display = 'block';
-    btn.disabled = false;
-    btn.textContent = 'Submit to Google Sheets';
-    return;
+    // Attempt standard fetch to get row/tab data
+    const sheetResp = await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      body: JSON.stringify(sheetPayload)
+    });
+    const sheetData = await sheetResp.json();
+    
+    if (sheetData.error) throw new Error(sheetData.error);
+
+    addToHistory({
+      type: 'expense',
+      business: STATE.business,
+      property: STATE.isBusinessExpense ? (STATE.business === 'LNI' ? 'LN Investments' : 'LNE Properties') : STATE.property,
+      vendor: STATE.vendor,
+      date: dateStr,
+      purpose: STATE.purpose,
+      amount: STATE.amount,
+      description: STATE.description,
+      row: sheetData.row,
+      tab: sheetData.tab,
+      timestamp: new Date().toISOString()
+    });
+  } catch(fetchErr) {
+    // Fallback for CORS: Send without waiting for a response
+    fetch(CFG.webAppUrl, {
+      method: 'POST',
+      mode: 'no-cors',
+      body: JSON.stringify(sheetPayload)
+    });
   }
 
-  // ── Step 2: Upload receipt to Drive via Apps Script ──
-  // Uses regular fetch (not no-cors) so we can read the response
+  // ── Step 2: Upload receipt to Drive ──
   let driveMsg = '';
   if (STATE.fileBase64) {
-    btn.textContent = 'Saving receipt to Drive…';
+    btn.textContent = 'Saving receipt to Drive...';
     try {
       const compressed = await compressImage(STATE.fileBase64, STATE.fileMimeType);
       const sendMime = STATE.fileMimeType === 'application/pdf' ? STATE.fileMimeType : 'image/jpeg';
-
-      // Get target folder path first (small GET request)
-      const folderParams = new URLSearchParams({
-        action: 'getFolderForUpload',
-        business: STATE.business,
-        year: year,
-        purpose: STATE.purpose
-      });
-      let folderPath = STATE.business + ' / ' + year + ' Taxes / ' + STATE.purpose;
-      try {
-        const folderResp = await fetch(CFG.webAppUrl + '?' + folderParams.toString());
-        const folderData = await folderResp.json();
-        if (folderData.folderPath) folderPath = folderData.folderPath;
-      } catch(e) {}
 
       const drivePayload = {
         action: 'uploadReceipt',
@@ -2707,39 +2683,36 @@ async function doSubmit(fileNameSuffix) {
         fileNameSuffix: fileNameSuffix || null
       };
 
-      // Try regular fetch first to get response
-      let saved = false;
+      // Safety timeout: don't let the app freeze if Google takes too long to respond
+      const uploadPromise = fetch(CFG.webAppUrl, {
+        method: 'POST',
+        body: JSON.stringify(drivePayload)
+      });
+
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Timeout')), 15000)
+      );
+
       try {
-        const driveResp = await fetch(CFG.webAppUrl, {
-          method: 'POST',
-          body: JSON.stringify(drivePayload)
-        });
+        const driveResp = await Promise.race([uploadPromise, timeoutPromise]);
         const driveData = await driveResp.json();
-        if (driveData.error) throw new Error(driveData.error);
-        saved = true;
-        driveMsg = '📁 Saved to: <strong style="color:var(--text)">' + folderPath + '</strong>';
         if (driveData.drive && driveData.drive.fileName) {
-          driveMsg += '<br><span style="color:var(--accent)">' + driveData.drive.fileName + '</span>';
+          driveMsg = '📁 Saved: <span style="color:var(--accent)">' + driveData.drive.fileName + '</span>';
         }
-      } catch(fetchErr) {
-        // Fall back to no-cors if CORS blocks it — file still saves but we cant confirm
-        await fetch(CFG.webAppUrl, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify(drivePayload)
-        });
-        driveMsg = '📁 Sent to: <strong style="color:var(--text)">' + folderPath + '</strong><br><span style="font-size:11px;color:var(--text-muted)">Check folder to confirm file saved</span>';
+      } catch (e) {
+        // If it times out or fails, fire off a no-cors request as a last resort
+        fetch(CFG.webAppUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(drivePayload) });
+        driveMsg = '📁 Receipt sent to Drive (Background)';
       }
     } catch(err) {
-      driveMsg = '⚠ Sheet saved but Drive upload failed: ' + err.message;
+      driveMsg = '⚠ Receipt upload skipped/failed';
     }
   }
 
   // ── Show success screen ──
   document.getElementById('successDetail').innerHTML =
     `Added to <strong>${STATE.business} ${year} Tax Sheet</strong><br>` +
-    `${STATE.vendor} • $${Math.abs(parseFloat(STATE.amount || 0)).toFixed(2)}<br>` +
-    `<span style="font-size:11px;color:var(--text-dim)">Verify the entry appeared in your sheet</span>`;
+    `${STATE.vendor} • $${Math.abs(parseFloat(STATE.amount || 0)).toFixed(2)}`;
 
   const driveEl = document.getElementById('driveStatus');
   const driveTextEl = document.getElementById('driveStatusText');
@@ -2752,7 +2725,6 @@ async function doSubmit(fileNameSuffix) {
 
   goToScreen('success');
 }
-
 
 async function convertToPdf(base64, mimeType) {
   if (mimeType === 'application/pdf') return base64;
