@@ -3174,20 +3174,30 @@ let propertyTotalsCache = null;
 
 async function loadPropertyTotals() {
   const loading = document.getElementById('propTotalsLoading');
+  
+  // Clear cache if switching businesses so it reloads the correct totals
+  if (propertyTotalsCache && propertyTotalsCache._business !== STATE.business) {
+    propertyTotalsCache = null;
+  }
+  
   if (propertyTotalsCache) { rebuildPropertyListWithTotals(); return; }
   if (loading) loading.style.display = 'flex';
+  
   try {
     const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
-    const resp = await fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year);
+    // Added &business= parameter to the fetch URL
+    const resp = await fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year + '&business=' + STATE.business);
     const data = await resp.json();
     if (!data.error) {
       propertyTotalsCache = data.totals;
+      propertyTotalsCache._business = STATE.business; // Store which biz these totals belong to
       rebuildPropertyListWithTotals();
     }
-  } catch(e) {}
+  } catch(e) {
+    console.error("Failed to load totals:", e);
+  }
   if (loading) loading.style.display = 'none';
 }
-
 function rebuildPropertyListWithTotals() {
   const loading = document.getElementById('propTotalsLoading');
   if (loading) loading.style.display = 'none';
