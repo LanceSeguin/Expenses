@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>Expense Entry v8</title>
+<title>Expense Entry V1.1.1</title>
 <!-- No external font dependencies - using system fonts -->
 <style>
   :root {
@@ -739,7 +739,7 @@
 
   <!-- Top Bar -->
   <div class="topbar">
-    <div class="topbar-logo">Expense Entry<span class="version-badge">v1.1.0</span></div>
+    <div class="topbar-logo">Expense Entry<span class="version-badge">V1.1.1</span></div>
     <div class="topbar-right">
       <div class="topbar-step" id="stepLabel"></div>
       <button class="settings-btn" id="settingsOpenBtn" onclick="openSettings()" title="Configure cards & properties" style="display:none">
@@ -812,12 +812,120 @@
     <div style="margin-top:auto; padding-top:20px">
       <button class="btn-primary" id="uploadNextBtn" onclick="goToScreen('business')" disabled>Continue with Expense</button>
       <button class="btn-back" onclick="goToScreen('rent')" style="margin-top:10px;border-color:var(--accent);color:var(--accent)">+ Add Rent Entry</button>
+      <button class="btn-back" id="overviewTriggerBtn" onclick="goToScreen('overview')" style="margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:center;">
+        <span style="font-size:15px;">📊</span> Business Overview
+      </button>
     </div>
   </div>
 
-  <!-- ══════════════════════════ -->
-  <!-- SCREEN 2: Business        -->
-  <!-- ══════════════════════════ -->
+  <!-- ══════════════════════════════════ -->
+  <!-- SCREEN: Business Overview         -->
+  <!-- ══════════════════════════════════ -->
+  <div class="screen" id="screen-overview">
+    <div class="screen-label">Financial Overview</div>
+    <div class="screen-title">Profit &amp; Loss</div>
+    <div class="screen-sub">Year-to-date summary across all businesses and properties.</div>
+
+    <!-- Year Selector -->
+    <div style="display:flex;align-items:center;justify-content:space-between;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;margin-bottom:20px;">
+      <button onclick="overviewChangeYear(-1)" style="background:transparent;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:color 0.15s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">‹</button>
+      <div id="overviewYearLabel" style="font-family:Georgia,serif;font-size:18px;color:var(--text);">2026</div>
+      <button onclick="overviewChangeYear(1)" style="background:transparent;border:none;color:var(--text-muted);font-size:20px;cursor:pointer;padding:4px 8px;border-radius:6px;transition:color 0.15s;" onmouseover="this.style.color='var(--accent)'" onmouseout="this.style.color='var(--text-muted)'">›</button>
+    </div>
+
+    <!-- Loading state -->
+    <div id="overviewLoading" style="display:none;align-items:center;gap:14px;padding:20px 0;color:var(--text-muted);font-size:14px;">
+      <div class="mini-spinner"></div> Loading data from sheet…
+    </div>
+
+    <!-- Error state -->
+    <div id="overviewError" class="error-msg" style="display:none;"></div>
+
+    <!-- Combined Total Banner -->
+    <div id="overviewBanner" style="background:linear-gradient(135deg,rgba(200,169,110,0.14),rgba(200,169,110,0.06));border:1.5px solid rgba(200,169,110,0.25);border-radius:var(--radius);padding:18px 20px;display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;">
+      <div>
+        <div style="font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;">Combined Net</div>
+        <div id="overviewCombinedNet" style="font-family:Georgia,serif;font-size:26px;color:var(--success);">—</div>
+      </div>
+      <div style="text-align:right;">
+        <div style="font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;">Portfolios</div>
+        <div id="overviewPortfolioSub" style="font-size:13px;color:var(--text-muted);">2 Businesses</div>
+      </div>
+    </div>
+
+    <!-- Business blocks injected here -->
+    <div id="overviewBizBlocks"></div>
+
+    <!-- Charts button -->
+    <button class="btn-back" id="overviewChartsBtn" onclick="goToScreen('charts')" style="margin-top:8px;border-color:rgba(200,169,110,0.4);color:var(--accent);display:flex;align-items:center;gap:10px;justify-content:center;">
+      <span style="font-size:15px;">📈</span> View Expense Charts
+    </button>
+
+    <button class="btn-back" onclick="goToScreen('upload')" style="margin-top:10px;">← Back to Entry</button>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- SCREEN: Charts                    -->
+  <!-- ══════════════════════════════════ -->
+  <div class="screen" id="screen-charts">
+    <div class="screen-label">Expense Charts</div>
+    <div class="screen-title">Analysis</div>
+    <div class="screen-sub" id="chartsSubLabel">Net income vs. expenses by category.</div>
+
+    <!-- Chart style selector -->
+    <div style="display:flex;gap:8px;margin-bottom:16px;">
+      <button class="cat-card selected" id="chartStyleDonut" onclick="setChartStyle('donut')" style="font-size:11px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;">
+        <span style="font-size:18px;">🍩</span>Donut
+      </button>
+      <button class="cat-card" id="chartStyleBar" onclick="setChartStyle('bar')" style="font-size:11px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;">
+        <span style="font-size:18px;">📊</span>Bar
+      </button>
+      <button class="cat-card" id="chartStyleCompare" onclick="setChartStyle('compare')" style="font-size:11px;padding:10px 6px;display:flex;flex-direction:column;align-items:center;gap:4px;flex:1;">
+        <span style="font-size:18px;">⚖️</span>Compare
+      </button>
+    </div>
+
+    <!-- Business toggle (hidden in compare mode) -->
+    <div id="chartsBizToggle" style="display:flex;gap:8px;margin-bottom:14px;">
+      <button class="cat-card selected" id="chartBizLNI" onclick="setChartBiz('LNI')" style="font-size:12px;flex:1;">LN Investments</button>
+      <button class="cat-card" id="chartBizLNEP" onclick="setChartBiz('LNEP')" style="font-size:12px;flex:1;">LNE Properties</button>
+    </div>
+
+    <!-- Property tabs (hidden in compare mode) -->
+    <div id="chartsPropTabs" style="display:flex;gap:8px;overflow-x:auto;padding-bottom:4px;margin-bottom:16px;scrollbar-width:none;"></div>
+
+    <!-- Loading -->
+    <div id="chartsLoading" style="display:none;align-items:center;gap:14px;padding:20px 0;color:var(--text-muted);font-size:14px;">
+      <div class="mini-spinner"></div> Loading chart data…
+    </div>
+    <div id="chartsError" class="error-msg" style="display:none;"></div>
+
+    <!-- Chart canvas card -->
+    <div id="chartsCard" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px;">
+      <div id="chartsCardHeader" style="padding:14px 18px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+        <div>
+          <div id="chartsCardTitle" style="font-family:Georgia,serif;font-size:15px;color:var(--text);">—</div>
+          <div id="chartsCardSub" style="font-size:11px;color:var(--text-dim);margin-top:2px;">Net by category</div>
+        </div>
+        <div style="text-align:right;">
+          <div id="chartsCardTotal" style="font-family:Georgia,serif;font-size:18px;color:var(--text);">—</div>
+          <div style="font-size:10px;color:var(--text-dim);margin-top:2px;letter-spacing:0.06em;text-transform:uppercase;">Net Total</div>
+        </div>
+      </div>
+      <div style="padding:16px 12px;position:relative;height:260px;">
+        <canvas id="mainChartCanvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Legend -->
+    <div id="chartsLegend" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;flex-direction:column;gap:9px;"></div>
+
+    <button class="btn-back" onclick="goToScreen('overview')" style="margin-top:4px;">← Back to Overview</button>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- SCREEN 2: Business               -->
+  <!-- ══════════════════════════════════ -->
   <div class="screen" id="screen-business">
     <div class="screen-label">Step 2 of 8</div>
     <div class="screen-title">Which Business?</div>
@@ -1837,6 +1945,8 @@ function goToScreen(name) {
   if (name === 'purpose') loadCategories();
   if (name === 'summary') buildSummary();
   if (name === 'success') renderHistory();
+  if (name === 'overview') setTimeout(initOverview, 50);
+  if (name === 'charts')   setTimeout(initCharts, 50);
 
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById('screen-' + name);
@@ -3265,6 +3375,445 @@ window.addEventListener('DOMContentLoaded', () => {
     goToScreen('upload');
   }
 });
+</script>
+
+<!-- Chart.js loaded async — only needed for overview/charts screens -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script>
+// ════════════════════════════════════════════
+// OVERVIEW + CHARTS
+// ════════════════════════════════════════════
+
+const OVERVIEW_PALETTE = [
+  '#c8a96e','#5ab882','#6ea8c8','#c86e9a','#a8c86e','#c8956e','#6e78c8','#e8c98e',
+  '#e05a4e','#70c8b0','#b0a86e','#8e6ec8'
+];
+
+// Cache chart data per business+year so we don't re-fetch on style/property switch
+const CHART_CACHE = {};  // key: "LNI-2026"
+
+let overviewYear = new Date().getFullYear();
+let chartsActiveBiz = 'LNI';
+let chartsActiveProp = 'all';
+let chartsActiveStyle = 'donut';
+let chartInstance = null;
+let chartDataCache = null; // data for currently selected biz
+
+// ── OVERVIEW ─────────────────────────────────────────────────
+function overviewChangeYear(delta) {
+  overviewYear += delta;
+  document.getElementById('overviewYearLabel').textContent = overviewYear;
+  loadOverviewData();
+}
+
+function initOverview() {
+  if (!document.getElementById('overviewYearLabel').textContent ||
+      document.getElementById('overviewYearLabel').textContent === '2026') {
+    overviewYear = new Date().getFullYear();
+    document.getElementById('overviewYearLabel').textContent = overviewYear;
+  }
+  loadOverviewData();
+}
+
+async function loadOverviewData() {
+  const loading = document.getElementById('overviewLoading');
+  const errEl   = document.getElementById('overviewError');
+  const banner  = document.getElementById('overviewBanner');
+  const blocks  = document.getElementById('overviewBizBlocks');
+  const chartsBtn = document.getElementById('overviewChartsBtn');
+
+  loading.style.display = 'flex';
+  errEl.style.display   = 'none';
+  banner.style.opacity  = '0.4';
+  blocks.innerHTML      = '';
+  chartsBtn.style.display = 'none';
+
+  try {
+    // Fetch both businesses in parallel
+    const [lniResp, lnepResp] = await Promise.all([
+      fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + overviewYear + '&business=LNI'),
+      fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + overviewYear + '&business=LNEP')
+    ]);
+    const lniData  = await lniResp.json();
+    const lnepData = await lnepResp.json();
+
+    if (lniData.error && lnepData.error) {
+      throw new Error(lniData.error);
+    }
+
+    banner.style.opacity = '1';
+
+    const lniTotals  = lniData.totals  || {};
+    const lnepTotals = lnepData.totals || {};
+
+    // Combined net
+    const allVals = [...Object.values(lniTotals), ...Object.values(lnepTotals)];
+    const combined = allVals.reduce((a,b) => a + b, 0);
+    const combinedEl = document.getElementById('overviewCombinedNet');
+    combinedEl.textContent = formatNet(combined);
+    combinedEl.style.color = combined >= 0 ? 'var(--success)' : 'var(--danger)';
+
+    const propCount = Object.keys(lniTotals).length + Object.keys(lnepTotals).length;
+    document.getElementById('overviewPortfolioSub').textContent =
+      '2 Businesses · ' + propCount + ' Properties';
+
+    // Render business blocks
+    renderOverviewBizBlock(blocks, 'LN Investments', lniTotals);
+    renderOverviewBizBlock(blocks, 'LNE Properties', lnepTotals);
+
+    chartsBtn.style.display = '';
+
+  } catch(e) {
+    errEl.textContent = 'Could not load data: ' + e.message;
+    errEl.style.display = 'block';
+  }
+
+  loading.style.display = 'none';
+}
+
+function renderOverviewBizBlock(container, bizLabel, totals) {
+  const props = Object.entries(totals).filter(([k]) => !k.startsWith('_'));
+  if (!props.length) return;
+
+  const bizNet = props.reduce((s,[,v]) => s + v, 0);
+  const blockId = 'ovBlock_' + bizLabel.replace(/\s/g,'');
+
+  const block = document.createElement('div');
+  block.style.cssText = 'background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px;';
+
+  const netColor = bizNet >= 0 ? 'var(--success)' : 'var(--danger)';
+  block.innerHTML = `
+    <div onclick="ovToggle('${blockId}')" style="background:linear-gradient(135deg,rgba(200,169,110,0.12),rgba(200,169,110,0.04));border-bottom:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;">
+      <div>
+        <div style="font-family:Georgia,serif;font-size:17px;color:var(--text);">${bizLabel}</div>
+        <div style="font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);margin-top:3px;">Net P&amp;L</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
+        <div style="font-family:Georgia,serif;font-size:22px;color:${netColor};">${formatNet(bizNet)}</div>
+        <div id="${blockId}_chevron" style="color:var(--text-dim);font-size:13px;transition:transform 0.25s;">▾</div>
+      </div>
+    </div>
+    <div id="${blockId}_list" style="display:flex;flex-direction:column;">
+      ${props.map(([name, val]) => {
+        const cls = val >= 0 ? 'var(--success)' : 'var(--danger)';
+        const dotClr = val >= 0 ? 'var(--success)' : 'var(--danger)';
+        return `<div style="display:flex;align-items:center;padding:13px 20px;border-bottom:1px solid var(--border);gap:12px;">
+          <div style="width:7px;height:7px;border-radius:50%;background:${dotClr};opacity:0.8;flex-shrink:0;"></div>
+          <div style="font-size:14px;font-weight:500;color:var(--text);flex:1;">${name}</div>
+          <div style="font-size:13px;font-weight:600;padding:3px 10px;border-radius:20px;background:${val>=0?'rgba(90,184,130,0.12)':'rgba(224,90,78,0.10)'};color:${cls};">${formatNet(val)}</div>
+        </div>`;
+      }).join('')}
+    </div>
+  `;
+  // remove last border
+  const rows = block.querySelectorAll('[style*="border-bottom:1px solid var(--border);gap:12px"]');
+  if (rows.length) rows[rows.length-1].style.borderBottom = 'none';
+
+  container.appendChild(block);
+}
+
+function ovToggle(blockId) {
+  const list    = document.getElementById(blockId + '_list');
+  const chevron = document.getElementById(blockId + '_chevron');
+  const isOpen  = list.style.display !== 'none';
+  list.style.display    = isOpen ? 'none' : 'flex';
+  chevron.style.transform = isOpen ? 'rotate(-90deg)' : 'rotate(0deg)';
+}
+
+function formatNet(val) {
+  const abs = Math.abs(val);
+  const str = '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+  return (val >= 0 ? '+' : '−') + str;
+}
+
+// ── CHARTS ───────────────────────────────────────────────────
+function initCharts() {
+  chartsActiveBiz   = 'LNI';
+  chartsActiveProp  = 'all';
+  chartsActiveStyle = 'donut';
+  document.getElementById('chartStyleDonut').classList.add('selected');
+  document.getElementById('chartStyleBar').classList.remove('selected');
+  document.getElementById('chartStyleCompare').classList.remove('selected');
+  document.getElementById('chartBizLNI').classList.add('selected');
+  document.getElementById('chartBizLNEP').classList.remove('selected');
+  document.getElementById('chartsSubLabel').textContent =
+    'Net income vs. expenses by category · ' + overviewYear;
+  loadChartData('LNI');
+}
+
+function setChartStyle(style) {
+  chartsActiveStyle = style;
+  ['donut','bar','compare'].forEach(s => {
+    document.getElementById('chartStyle' + s.charAt(0).toUpperCase() + s.slice(1))
+      .classList.toggle('selected', s === style);
+  });
+  // Compare hides biz toggle and prop tabs
+  const isCompare = style === 'compare';
+  document.getElementById('chartsBizToggle').style.display = isCompare ? 'none' : 'flex';
+  document.getElementById('chartsPropTabs').style.display  = isCompare ? 'none' : 'flex';
+  renderChart();
+}
+
+function setChartBiz(biz) {
+  chartsActiveBiz  = biz;
+  chartsActiveProp = 'all';
+  document.getElementById('chartBizLNI').classList.toggle('selected', biz === 'LNI');
+  document.getElementById('chartBizLNEP').classList.toggle('selected', biz === 'LNEP');
+  loadChartData(biz);
+}
+
+function setChartProp(prop, el) {
+  chartsActiveProp = prop;
+  document.querySelectorAll('#chartsPropTabs .cat-card').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  renderChart();
+}
+
+async function loadChartData(biz) {
+  const cacheKey = biz + '-' + overviewYear;
+  const loading  = document.getElementById('chartsLoading');
+  const errEl    = document.getElementById('chartsError');
+
+  if (CHART_CACHE[cacheKey]) {
+    chartDataCache = CHART_CACHE[cacheKey];
+    buildPropTabs();
+    renderChart();
+    return;
+  }
+
+  loading.style.display = 'flex';
+  errEl.style.display   = 'none';
+  document.getElementById('chartsCard').style.opacity = '0.4';
+  document.getElementById('chartsLegend').innerHTML = '';
+
+  try {
+    const resp = await fetch(CFG.webAppUrl + '?action=getChartData&year=' + overviewYear + '&business=' + biz);
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    CHART_CACHE[cacheKey] = data;
+    chartDataCache = data;
+    buildPropTabs();
+    renderChart();
+  } catch(e) {
+    errEl.textContent = 'Could not load chart data: ' + e.message;
+    errEl.style.display = 'block';
+  }
+
+  loading.style.display = 'none';
+  document.getElementById('chartsCard').style.opacity = '1';
+}
+
+function buildPropTabs() {
+  const tabsEl = document.getElementById('chartsPropTabs');
+  tabsEl.innerHTML = '';
+  if (!chartDataCache) return;
+
+  const props = ['all', ...chartDataCache.propertyNames];
+  props.forEach(p => {
+    const btn = document.createElement('button');
+    btn.className = 'cat-card' + (p === chartsActiveProp ? ' selected' : '');
+    btn.style.cssText = 'font-size:12px;flex-shrink:0;white-space:nowrap;padding:7px 14px;border-radius:20px;';
+    btn.textContent = p === 'all' ? 'All Properties' : p;
+    btn.onclick = () => setChartProp(p, btn);
+    tabsEl.appendChild(btn);
+  });
+}
+
+function getActiveChartData() {
+  if (!chartDataCache) return { cats: [], vals: [], total: 0, label: '—' };
+
+  const d = chartDataCache;
+  let cats = [], vals = [];
+
+  if (chartsActiveProp === 'all' || chartsActiveStyle === 'compare') {
+    // Sum across all properties
+    d.categories.forEach((cat, i) => {
+      const sum = d.propertyNames.reduce((s, p) => s + (d.properties[p][cat] || 0), 0);
+      cats.push(cat);
+      vals.push(sum);
+    });
+  } else {
+    d.categories.forEach(cat => {
+      cats.push(cat);
+      vals.push(d.properties[chartsActiveProp][cat] || 0);
+    });
+  }
+
+  // Remove zero rows
+  const filtered = cats.map((c,i) => ({c, v: vals[i]})).filter(x => x.v !== 0);
+  cats = filtered.map(x => x.c);
+  vals = filtered.map(x => x.v);
+  const total = vals.reduce((a,b)=>a+b, 0);
+  const label = chartsActiveProp === 'all' ? 'All Properties' : chartsActiveProp;
+  return { cats, vals, total, label };
+}
+
+function renderChart() {
+  if (!chartDataCache) return;
+  if (chartInstance) { try { chartInstance.destroy(); } catch(e){} chartInstance = null; }
+
+  const d = getActiveChartData();
+  const cardTitle = document.getElementById('chartsCardTitle');
+  const cardTotal = document.getElementById('chartsCardTotal');
+  const legend    = document.getElementById('chartsLegend');
+
+  cardTitle.textContent = chartsActiveStyle === 'compare'
+    ? (chartsActiveBiz === 'LNI' ? 'LN Investments' : 'LNE Properties') + ' · All Properties'
+    : d.label;
+  cardTotal.textContent = formatNet(d.total);
+  cardTotal.style.color = d.total >= 0 ? 'var(--success)' : 'var(--danger)';
+
+  legend.innerHTML = '';
+
+  const ctx = document.getElementById('mainChartCanvas').getContext('2d');
+
+  if (chartsActiveStyle === 'donut') renderDonut(ctx, d, legend);
+  else if (chartsActiveStyle === 'bar') renderBar(ctx, d, legend);
+  else if (chartsActiveStyle === 'compare') renderCompare(ctx, legend);
+}
+
+function barColor(val) {
+  return val >= 0
+    ? 'rgba(90,184,130,0.75)'
+    : 'rgba(224,90,78,0.75)';
+}
+function barBorder(val) {
+  return val >= 0 ? '#5ab882' : '#e05a4e';
+}
+
+const CHART_TOOLTIP_OPTS = {
+  backgroundColor: '#222', borderColor: '#3a3a3a', borderWidth: 1,
+  titleColor: '#f0ede8', bodyColor: '#888880',
+};
+
+function renderDonut(ctx, d, legend) {
+  const total = Math.abs(d.total) || 1;
+  chartInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: d.cats,
+      datasets: [{
+        data: d.vals.map(Math.abs),
+        backgroundColor: OVERVIEW_PALETTE.slice(0, d.cats.length),
+        borderColor: '#1a1a1a', borderWidth: 3, hoverOffset: 6
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '68%',
+      plugins: {
+        legend: { display: false },
+        tooltip: { ...CHART_TOOLTIP_OPTS,
+          callbacks: { label: c => ' ' + formatNet(d.vals[c.dataIndex]) + ' (' + ((Math.abs(d.vals[c.dataIndex])/total)*100).toFixed(1) + '%)' }
+        }
+      }
+    }
+  });
+
+  // Legend rows
+  d.cats.forEach((cat, i) => {
+    const pct = ((Math.abs(d.vals[i]) / total) * 100).toFixed(1);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;';
+    row.innerHTML = `
+      <div style="width:10px;height:10px;border-radius:3px;background:${OVERVIEW_PALETTE[i]};flex-shrink:0;"></div>
+      <div style="font-size:12px;color:var(--text-muted);flex:1;">${cat}</div>
+      <div style="font-size:12px;font-weight:600;color:${d.vals[i]>=0?'var(--success)':'var(--danger)'};">${formatNet(d.vals[i])}</div>
+      <div style="font-size:11px;color:var(--text-dim);width:36px;text-align:right;">${pct}%</div>
+    `;
+    legend.appendChild(row);
+  });
+}
+
+function renderBar(ctx, d, legend) {
+  const sorted = d.cats.map((c,i)=>({c,v:d.vals[i]})).sort((a,b)=>b.v-a.v);
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: sorted.map(x=>x.c),
+      datasets: [{
+        data: sorted.map(x=>x.v),
+        backgroundColor: sorted.map(x=>barColor(x.v)),
+        borderColor: sorted.map(x=>barBorder(x.v)),
+        borderWidth: 1.5, borderRadius: 5
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { ...CHART_TOOLTIP_OPTS,
+        callbacks: { label: c => ' ' + formatNet(c.raw) }
+      }},
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: '#888880', font: { size: 10 } } },
+        y: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#888880', font: { size: 10 },
+          callback: v => (v>=0?'+':'-') + '$' + Math.abs(v).toLocaleString() } }
+      }
+    }
+  });
+
+  sorted.forEach((item, i) => {
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;align-items:center;gap:10px;';
+    row.innerHTML = `
+      <div style="width:10px;height:10px;border-radius:3px;background:${barColor(item.v)};flex-shrink:0;"></div>
+      <div style="font-size:12px;color:var(--text-muted);flex:1;">${item.c}</div>
+      <div style="font-size:12px;font-weight:600;color:${item.v>=0?'var(--success)':'var(--danger)'};">${formatNet(item.v)}</div>
+    `;
+    legend.appendChild(row);
+  });
+}
+
+function renderCompare(ctx, legend) {
+  const d = chartDataCache;
+  const props = d.propertyNames;
+  const totals = props.map(p => d.totals[p] || 0);
+
+  chartInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: props,
+      datasets: [{
+        data: totals,
+        backgroundColor: totals.map(barColor),
+        borderColor: totals.map(barBorder),
+        borderWidth: 1.5, borderRadius: 5
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false }, tooltip: { ...CHART_TOOLTIP_OPTS,
+        callbacks: { label: c => ' ' + formatNet(c.raw) }
+      }},
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.06)' }, ticks: { color: '#888880', font: { size: 10 },
+          callback: v => (v>=0?'+':'-') + '$' + Math.abs(v).toLocaleString() } },
+        y: { grid: { display: false }, ticks: { color: '#888880', font: { size: 11 } } }
+      }
+    }
+  });
+
+  const grandTotal = totals.reduce((a,b)=>a+b,0);
+  const maxAbs = Math.max(...totals.map(Math.abs)) || 1;
+
+  props.forEach((p, i) => {
+    const pct = grandTotal !== 0 ? ((totals[i] / grandTotal) * 100).toFixed(1) : '0.0';
+    const barW = ((Math.abs(totals[i]) / maxAbs) * 100).toFixed(1);
+    const row = document.createElement('div');
+    row.style.cssText = 'display:flex;flex-direction:column;gap:4px;';
+    row.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;">
+        <div style="font-size:12px;color:${totals[i]>=0?'var(--success)':'var(--danger)'};font-weight:600;width:130px;flex-shrink:0;">${p}</div>
+        <div style="flex:1;height:6px;background:var(--surface2);border-radius:3px;overflow:hidden;">
+          <div style="height:100%;border-radius:3px;background:${barColor(totals[i])};width:${barW}%;"></div>
+        </div>
+        <div style="font-size:12px;font-weight:600;color:${totals[i]>=0?'var(--success)':'var(--danger)'};width:72px;text-align:right;">${formatNet(totals[i])}</div>
+      </div>
+      <div style="font-size:10px;color:var(--text-dim);padding-left:140px;">${pct}% of combined</div>
+    `;
+    legend.appendChild(row);
+  });
+}
 </script>
 </body>
 </html>
