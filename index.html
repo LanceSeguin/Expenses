@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-<title>Expense Entry V1.1.0</title>
+<title>Expense Entry V1.1.1</title>
 <!-- No external font dependencies - using system fonts -->
 <style>
   :root {
@@ -739,7 +739,7 @@
 
   <!-- Top Bar -->
   <div class="topbar">
-    <div class="topbar-logo">Expense Entry<span class="version-badge">V1.1.0</span></div>
+    <div class="topbar-logo">Expense Entry<span class="version-badge">V1.1.1</span></div>
     <div class="topbar-right">
       <div class="topbar-step" id="stepLabel"></div>
       <button class="settings-btn" id="settingsOpenBtn" onclick="openSettings()" title="Configure cards & properties" style="display:none">
@@ -3446,19 +3446,27 @@ async function loadOverviewData() {
     const lniTotals  = lniData.totals  || {};
     const lnepTotals = lnepData.totals || {};
 
-    // Combined net: use bizTotal from H1 — strip $ and commas if returned as string
+    // Combined net: use bizTotal directly from H1
     function parseBizTotal(val) {
+      if (val === 'ERROR' || val === null || val === undefined || val === '') return 'ERROR';
       if (typeof val === 'number') return val;
-      if (typeof val === 'string') return parseFloat(val.replace(/[$,\s]/g, '')) || 0;
-      return 0;
+      const n = parseFloat(String(val).replace(/[$,\s]/g, ''));
+      return isNaN(n) ? 'ERROR' : n;
     }
     const lniBizTotal  = parseBizTotal(lniData.bizTotal);
     const lnepBizTotal = parseBizTotal(lnepData.bizTotal);
-    const combined = lniBizTotal + lnepBizTotal;
+    const combined = (lniBizTotal === 'ERROR' || lnepBizTotal === 'ERROR')
+      ? 'ERROR'
+      : lniBizTotal + lnepBizTotal;
 
     const combinedEl = document.getElementById('overviewCombinedNet');
-    combinedEl.textContent = formatNet(combined);
-    combinedEl.style.color = combined >= 0 ? 'var(--success)' : 'var(--danger)';
+    if (combined === 'ERROR') {
+      combinedEl.textContent = 'ERROR';
+      combinedEl.style.color = 'var(--danger)';
+    } else {
+      combinedEl.textContent = formatNet(combined);
+      combinedEl.style.color = combined >= 0 ? 'var(--success)' : 'var(--danger)';
+    }
 
     const propCount = Object.keys(lniTotals).length + Object.keys(lnepTotals).length;
     document.getElementById('overviewPortfolioSub').textContent =
@@ -3478,17 +3486,18 @@ async function loadOverviewData() {
   loading.style.display = 'none';
 }
 
-function renderOverviewBizBlock(container, bizLabel, totals) {
+function renderOverviewBizBlock(container, bizLabel, totals, bizTotal) {
   const props = Object.entries(totals).filter(([k]) => !k.startsWith('_'));
   if (!props.length) return;
 
-  const bizNet = props.reduce((s,[,v]) => s + v, 0);
-  const blockId = 'ovBlock_' + bizLabel.replace(/\s/g,'');
+  const blockId   = 'ovBlock_' + bizLabel.replace(/\s/g,'');
+  const isError   = (bizTotal === 'ERROR' || bizTotal === null || bizTotal === undefined);
+  const netColor  = isError ? 'var(--danger)' : (bizTotal >= 0 ? 'var(--success)' : 'var(--danger)');
+  const netDisplay = isError ? 'ERROR' : formatNet(bizTotal);
 
   const block = document.createElement('div');
   block.style.cssText = 'background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:14px;';
 
-  const netColor = bizNet >= 0 ? 'var(--success)' : 'var(--danger)';
   block.innerHTML = `
     <div onclick="ovToggle('${blockId}')" style="background:linear-gradient(135deg,rgba(200,169,110,0.12),rgba(200,169,110,0.04));border-bottom:1px solid var(--border);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none;">
       <div>
@@ -3496,7 +3505,7 @@ function renderOverviewBizBlock(container, bizLabel, totals) {
         <div style="font-size:10px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);margin-top:3px;">Net P&amp;L</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:3px;">
-        <div style="font-family:Georgia,serif;font-size:22px;color:${netColor};">${formatNet(bizNet)}</div>
+        <div style="font-family:Georgia,serif;font-size:22px;color:${netColor};">${netDisplay}</div>
         <div id="${blockId}_chevron" style="color:var(--text-dim);font-size:13px;transition:transform 0.25s;">▾</div>
       </div>
     </div>
