@@ -3431,8 +3431,8 @@ async function loadOverviewData() {
   try {
     // Fetch both businesses in parallel
     const [lniResp, lnepResp] = await Promise.all([
-      fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + overviewYear + '&business=LNI'),
-      fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + overviewYear + '&business=LNEP')
+      fetch(CFG.webAppUrl + '?action=getOverviewTotals&year=' + overviewYear + '&business=LNI'),
+      fetch(CFG.webAppUrl + '?action=getOverviewTotals&year=' + overviewYear + '&business=LNEP')
     ]);
     const lniData  = await lniResp.json();
     const lnepData = await lnepResp.json();
@@ -3446,9 +3446,11 @@ async function loadOverviewData() {
     const lniTotals  = lniData.totals  || {};
     const lnepTotals = lnepData.totals || {};
 
-    // Combined net
-    const allVals = [...Object.values(lniTotals), ...Object.values(lnepTotals)];
-    const combined = allVals.reduce((a,b) => a + b, 0);
+    // Combined net: sum of H1 from each sheet (bizTotal)
+    const lniBizTotal  = typeof lniData.bizTotal  === 'number' ? lniData.bizTotal  : Object.values(lniTotals).reduce((a,b)=>a+b,0);
+    const lnepBizTotal = typeof lnepData.bizTotal === 'number' ? lnepData.bizTotal : Object.values(lnepTotals).reduce((a,b)=>a+b,0);
+    const combined = lniBizTotal + lnepBizTotal;
+
     const combinedEl = document.getElementById('overviewCombinedNet');
     combinedEl.textContent = formatNet(combined);
     combinedEl.style.color = combined >= 0 ? 'var(--success)' : 'var(--danger)';
@@ -3457,9 +3459,9 @@ async function loadOverviewData() {
     document.getElementById('overviewPortfolioSub').textContent =
       '2 Businesses · ' + propCount + ' Properties';
 
-    // Render business blocks
-    renderOverviewBizBlock(blocks, 'LN Investments', lniTotals);
-    renderOverviewBizBlock(blocks, 'LNE Properties', lnepTotals);
+    // Render business blocks — pass bizTotal so header shows H1 value
+    renderOverviewBizBlock(blocks, 'LN Investments',  lniTotals,  lniBizTotal);
+    renderOverviewBizBlock(blocks, 'LNE Properties',  lnepTotals, lnepBizTotal);
 
     chartsBtn.style.display = '';
 
