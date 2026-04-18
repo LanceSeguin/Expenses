@@ -739,7 +739,7 @@
 
   <!-- Top Bar -->
   <div class="topbar">
-    <div class="topbar-logo">Expense Entry<span class="version-badge">V1.1.2</span></div>
+    <div class="topbar-logo">Expense Entry<span class="version-badge">V1.1.0</span></div>
     <div class="topbar-right">
       <div class="topbar-step" id="stepLabel"></div>
       <button class="settings-btn" id="settingsOpenBtn" onclick="openSettings()" title="Configure cards & properties" style="display:none">
@@ -2110,11 +2110,44 @@ function parseReceiptText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const fullText = text;
 
-  // ── Date parsing ──
-  // Collect all date candidates and score them, pick the best
+  // ── VENDOR — store helper is most reliable ──
+  const helperMatch = matchStoreHelper(fullText);
+  if (helperMatch) {
+    STATE.scanned.vendor = helperMatch;
+  } else {
+    // Fall back to first meaningful non-numeric line
+    const skipWords = /receipt|invoice|total|tax|date|amount|thank|welcome|store|purchase|sign|track|rewards|manage|centers|llc|dr\.|baton|rouge|sale|trans|salesperson|subtotal|cashier|terminal/i;
+    for (const line of lines.slice(0, 10)) {
+      if (line.length > 2 && line.length < 35
+          && !skipWords.test(line)
+          && !/^\d/.test(line)
+          && !/^\$/.test(line)
+          && !/^\*/.test(line)
+          && !/^-/.test(line)
+          && !/^#/.test(line)) {
+        STATE.scanned.vendor = line;
+        break;
+      }
+    }
+  }
+
+  // ── CARD LAST 4 — try multiple patterns ──
+  // Order matters — most specific first
+  const cardPatterns = [
+    /x{4,}(\d{4})\s*(?:visa|mc|mastercard|amex|disc)/i,  // XXXXXXXXXXX1326 VISA
+    /x{4,}(\d{4})/i,                                       // XXXXXXXXXXXX4126
+    /(?:visa|mc|mastercard|amex|disc)[^\n]*x{3,}(\d{4})/i, // VISA: XXXX...1326
+    /(?:card|ending|ending in)[^\d]*(\d{4})(?!\d)/i,      // card ending 1326
+  ];
+  for (const pat of cardPatterns) {
+    const m = fullText.match(pat);
+    if (m && m[1]) { STATE.scanned.cardLast4 = m[1]; break; }
+  }
+
+  // ── DATE — collect all candidates, pick best ──
   const dateCandidates = [];
 
-  // Format 1: MM-DD-YY or MM-DD-YYYY (e.g. 03-08-26)
+  // MM-DD-YY or MM-DD-YYYY (Lowe's: 04-14-26)
   const re1 = /(\d{1,2})-(\d{1,2})-(\d{2,4})/g;
   let m1;
   while ((m1 = re1.exec(fullText)) !== null) {
@@ -2122,11 +2155,11 @@ function parseReceiptText(text) {
     if (yr < 100) yr += 2000;
     const mo = parseInt(m1[1]), dy = parseInt(m1[2]);
     if (yr >= 2020 && yr <= 2035 && mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31) {
-      dateCandidates.push({ d: new Date(yr, mo-1, dy), score: 3 });
+      dateCandidates.push({ d: new Date(yr, mo-1, dy), score: 3, src: 'dash' });
     }
   }
 
-  // Format 2: MM/DD/YY or MM/DD/YYYY (e.g. 03/08/26)
+  // MM/DD/YY or MM/DD/YYYY (Home Depot: 04/15/26)
   const re2 = /(\d{1,2})\/(\d{1,2})\/(\d{2,4})/g;
   let m2;
   while ((m2 = re2.exec(fullText)) !== null) {
@@ -2134,102 +2167,80 @@ function parseReceiptText(text) {
     if (yr < 100) yr += 2000;
     const mo = parseInt(m2[1]), dy = parseInt(m2[2]);
     if (yr >= 2020 && yr <= 2035 && mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31) {
-      dateCandidates.push({ d: new Date(yr, mo-1, dy), score: 3 });
+      dateCandidates.push({ d: new Date(yr, mo-1, dy), score: 3, src: 'slash' });
     }
   }
 
-  // Format 3: YYYY-MM-DD (ISO)
+  // YYYY-MM-DD ISO
   const re3 = /(202\d)-(\d{2})-(\d{2})/g;
   let m3;
   while ((m3 = re3.exec(fullText)) !== null) {
     const d = new Date(parseInt(m3[1]), parseInt(m3[2])-1, parseInt(m3[3]));
-    if (!isNaN(d)) dateCandidates.push({ d, score: 4 });
+    if (!isNaN(d)) dateCandidates.push({ d, score: 4, src: 'iso' });
   }
 
-  // Format 4: Month name (Mar 8, 2026)
+  // Month name
   const re4 = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/gi;
   let m4;
   while ((m4 = re4.exec(fullText)) !== null) {
     const d = new Date(m4[0]);
-    if (!isNaN(d)) dateCandidates.push({ d, score: 2 });
+    if (!isNaN(d)) dateCandidates.push({ d, score: 2, src: 'month' });
   }
 
-  // Pick highest scored valid candidate
-  // Filter out clearly wrong dates (future > 1 year, or before 2020)
+  // Pick best: filter invalid, sort by score, take first
   const now = new Date();
-  const validCandidates = dateCandidates.filter(c => {
+  const valid = dateCandidates.filter(c => {
     const yr = c.d.getFullYear();
     return !isNaN(c.d) && yr >= 2020 && yr <= now.getFullYear() + 1;
   });
-  if (validCandidates.length > 0) {
-    validCandidates.sort((a,b) => b.score - a.score);
-    STATE.scanned.date = validCandidates[0].d;
+  if (valid.length > 0) {
+    valid.sort((a,b) => b.score - a.score);
+    STATE.scanned.date = valid[0].d;
   }
 
-  // ── Amount — always negative (expense/charge) ──
-  // Receipt amounts are always positive numbers — we always store as negative
-  // because all scanned receipts are purchases/expenses not refunds
+  // ── AMOUNT — always negative (expense) ──
+  // Priority 1: VISA/card line total (most reliable — this is what was actually charged)
   let foundAmount = null;
 
-  // Priority 1: Card charge line (VISA: 27.60 or VISA XXXXXXXXX1326 AMOUNT: 27.60)
-  const cardAmountMatch = fullText.match(/(?:visa|mastercard|mc|amex|disc)[^\n]*?([\d,]+\.\d{2})/i);
-  if (cardAmountMatch) {
-    foundAmount = parseFloat(cardAmountMatch[1].replace(',', ''));
+  // "VISA: 44.09" or "VISA: $44.09" or "XXXXXXXXXXX1326 VISA ... $87.75"
+  const visaLine = fullText.match(/visa[:\s]+\$?([\d,]+\.\d{2})/i);
+  if (visaLine) foundAmount = parseFloat(visaLine[1].replace(',',''));
+
+  // "USD$ 87.75" or "USD $87.75"
+  if (!foundAmount) {
+    const usdMatch = fullText.match(/usd\$?\s*\$?([\d,]+\.\d{2})/i);
+    if (usdMatch) foundAmount = parseFloat(usdMatch[1].replace(',',''));
   }
 
-  // Priority 2: INVOICE TOTAL or TOTAL line
+  // TOTAL line (not subtotal)
   if (!foundAmount) {
-    const totalMatch = fullText.match(/(?:invoice\s+\d+\s+total|total\s+amount|amount\s+due|balance\s+due)[^\d]*([\d,]+\.\d{2})/i);
-    if (totalMatch) foundAmount = parseFloat(totalMatch[1].replace(',', ''));
+    const totalMatch = fullText.match(/^\s*(?:invoice\s+\d+\s+)?total[:\s]+\$?([\d,]+\.\d{2})/im);
+    if (totalMatch) foundAmount = parseFloat(totalMatch[1].replace(',',''));
   }
 
-  // Priority 3: Largest amount on receipt
+  // Largest amount as last resort
   if (!foundAmount) {
-    const amountMatches = [...fullText.matchAll(/\$?\s?([\d,]+\.\d{2})/g)];
-    if (amountMatches.length) {
-      const amounts = amountMatches.map(m => parseFloat(m[1].replace(',', '')));
-      foundAmount = Math.max(...amounts);
+    const allAmounts = [...fullText.matchAll(/\$([\d,]+\.\d{2})/g)];
+    if (allAmounts.length) {
+      foundAmount = Math.max(...allAmounts.map(m => parseFloat(m[1].replace(',',''))));
     }
   }
 
-  // Always store as negative — it is always an expense
-  if (foundAmount) {
-    STATE.scanned.amount = -Math.abs(foundAmount);
+  if (foundAmount && foundAmount > 0) {
+    STATE.scanned.amount = -foundAmount; // always negative = expense
   }
 
-  // ── Vendor — store helper first, then first meaningful line near top ──
-  // matchStoreHelper scans the full OCR text for known store keywords,
-  // which is more reliable than guessing from the first line.
-  const helperMatch = matchStoreHelper(fullText);
-  if (helperMatch) {
-    STATE.scanned.vendor = helperMatch;
-  } else {
-    const skipWords = /receipt|invoice|total|tax|date|amount|thank|welcome|store|purchase|sign|track|rewards|manage|centers|llc|dr\.|baton|rouge|sale|trans|salesperson/i;
-    for (const line of lines.slice(0, 12)) {
-      if (line.length > 2 && line.length < 35 && !skipWords.test(line) && !/^\d/.test(line) && !/^\$/.test(line) && !/^\*/.test(line) && !/^-/.test(line)) {
-        STATE.scanned.vendor = line;
-        break;
-      }
-    }
-  }
-
-  // ── Card last 4 — match any line with X's followed by 4 digits ──
-  // Handles: VISA XXXXXXXXXXXX1326, card ending 1326, xxxx1326, x{4}1326 etc.
-  const cardPatterns = [
-    /x{4,}(\d{4})/i,                                          // XXXXXXXXXXXX1326
-    /(?:visa|mc|mastercard|amex|disc)[^\n]*x+([\d]{4})/i,    // VISA ... X...X1326
-    /(?:card|ending|ending in)[^\d]*(\d{4})/i,               // card ending 1326
-    /(?:visa|mc|mastercard|amex|disc)[^\d]*(\d{4})(?!\d)/i, // VISA: 1326
-  ];
-  for (const pat of cardPatterns) {
-    const m = fullText.match(pat);
-    if (m) { STATE.scanned.cardLast4 = m[1]; break; }
-  }
-
-  // ── Description — first item line ──
-  const itemLines = lines.filter(l => l.length > 3 && l.length < 30 && !/\$/.test(l) && !/^\*/.test(l) && !/^\d{5,}/.test(l)).slice(3, 7);
+  // ── DESCRIPTION — first item line ──
+  const itemLines = lines.filter(l =>
+    l.length > 3 && l.length < 35
+    && !/\$/.test(l)
+    && !/^\*/.test(l)
+    && !/^\d{5,}/.test(l)
+    && !/total|subtotal|tax|visa|mastercard|amex|invoice|store|terminal/i.test(l)
+  ).slice(3, 8);
   if (itemLines.length) STATE.scanned.description = itemLines[0].substring(0, 20);
 }
+
 
 
 // ════════════════════════════════════════════
