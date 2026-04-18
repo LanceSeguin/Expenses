@@ -1612,12 +1612,11 @@ function saveConfigToStorage(cfg) {
 function getConfig() {
   const stored = loadConfig();
   if (stored) {
-    // Always apply hardcoded values if stored ones are empty
-    // This means existing users also get the URL/key without re-entering
-    if (!stored.webAppUrl && HARDCODED_WEB_APP_URL && !HARDCODED_WEB_APP_URL.includes('PASTE_')) {
+    // Always force hardcoded values — they are the source of truth
+    if (HARDCODED_WEB_APP_URL && !HARDCODED_WEB_APP_URL.includes('PASTE_')) {
       stored.webAppUrl = HARDCODED_WEB_APP_URL;
     }
-    if (!stored.visionApiKey && HARDCODED_VISION_KEY) {
+    if (HARDCODED_VISION_KEY) {
       stored.visionApiKey = HARDCODED_VISION_KEY;
     }
     return stored;
@@ -2214,9 +2213,18 @@ function parseReceiptText(text) {
     }
   }
 
-  // ── Card last 4 ──
-  const cardMatch = fullText.match(/(?:visa|mc|mastercard|amex|disc|card|xxxx|ending|x{4})[^\d]*(\d{4})/i);
-  if (cardMatch) STATE.scanned.cardLast4 = cardMatch[1];
+  // ── Card last 4 — match any line with X's followed by 4 digits ──
+  // Handles: VISA XXXXXXXXXXXX1326, card ending 1326, xxxx1326, x{4}1326 etc.
+  const cardPatterns = [
+    /x{4,}(\d{4})/i,                                          // XXXXXXXXXXXX1326
+    /(?:visa|mc|mastercard|amex|disc)[^\n]*x+([\d]{4})/i,    // VISA ... X...X1326
+    /(?:card|ending|ending in)[^\d]*(\d{4})/i,               // card ending 1326
+    /(?:visa|mc|mastercard|amex|disc)[^\d]*(\d{4})(?!\d)/i, // VISA: 1326
+  ];
+  for (const pat of cardPatterns) {
+    const m = fullText.match(pat);
+    if (m) { STATE.scanned.cardLast4 = m[1]; break; }
+  }
 
   // ── Description — first item line ──
   const itemLines = lines.filter(l => l.length > 3 && l.length < 30 && !/\$/.test(l) && !/^\*/.test(l) && !/^\d{5,}/.test(l)).slice(3, 7);
