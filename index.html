@@ -2477,9 +2477,11 @@ function calNav(dir) {
 }
 
 function renderCalendar() {
-  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-  document.getElementById('calMonthYear').textContent = `${months[STATE.calMonth]} ${STATE.calYear}`;
+  const monthYearEl = document.getElementById('calMonthYear');
   const cells = document.getElementById('calCells');
+  if (!monthYearEl || !cells) return; // screen not in DOM yet
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  monthYearEl.textContent = `${months[STATE.calMonth]} ${STATE.calYear}`;
   cells.innerHTML = '';
   const firstDay = new Date(STATE.calYear, STATE.calMonth, 1).getDay();
   const daysInMonth = new Date(STATE.calYear, STATE.calMonth + 1, 0).getDate();
@@ -3439,7 +3441,8 @@ function resetApp() {
 // ════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
   CFG = getConfig();
-  renderCalendar();
+  // Only render calendar if the element is present (it lives inside the date screen)
+  if (document.getElementById('calMonthYear')) renderCalendar();
   updateBusinessSubtitles();
 
   // Apply hardcoded values if not already set
