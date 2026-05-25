@@ -3620,12 +3620,11 @@ async function submitReps() {
   };
 
   try {
-    const resp = await fetch(CFG.webAppUrl, {
+    await fetch(CFG.webAppUrl, {
       method: 'POST',
+      mode: 'no-cors',
       body: JSON.stringify(payload)
     });
-    const data = await resp.json();
-    if (data.error) throw new Error(data.error);
 
     // Add to session history
     addToHistory({
@@ -3636,7 +3635,6 @@ async function submitReps() {
       amount: 0,
       description: payload.task.substring(0, 30),
       date: dateStr,
-      row: data.row,
       tab: 'REPS',
       timestamp: new Date().toISOString()
     });
