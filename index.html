@@ -739,7 +739,7 @@
 
   <!-- Top Bar -->
   <div class="topbar">
-    <div class="topbar-logo">Expense Entry<span class="version-badge">V1.1.0</span></div>
+    <div class="topbar-logo">Expense Entry<span class="version-badge">V1.1.1</span></div>
     <div class="topbar-right">
       <div class="topbar-step" id="stepLabel"></div>
       <button class="settings-btn" id="settingsOpenBtn" onclick="openSettings()" title="Configure cards & properties" style="display:none">
@@ -812,6 +812,7 @@
     <div style="margin-top:auto; padding-top:20px">
       <button class="btn-primary" id="uploadNextBtn" onclick="goToScreen('business')" disabled>Continue with Expense</button>
       <button class="btn-back" onclick="goToScreen('rent')" style="margin-top:10px;border-color:var(--accent);color:var(--accent)">+ Add Rent Entry</button>
+      <button class="btn-back" onclick="goToScreen('reps')" style="margin-top:8px;border-color:var(--accent);color:var(--accent)">+ Add REPS Entry</button>
       <button class="btn-back" id="overviewTriggerBtn" onclick="goToScreen('overview')" style="margin-top:8px;display:flex;align-items:center;gap:10px;justify-content:center;">
         <span style="font-size:15px;">📊</span> Business Overview
       </button>
@@ -1158,6 +1159,7 @@
     <div style="margin-top:16px;display:flex;gap:10px">
       <button class="btn-primary" onclick="resetApp()" style="margin-top:0">Add Another Expense</button>
       <button class="btn-back" onclick="goToScreen('rent')" style="margin-top:0;width:auto;padding:14px 16px;border-color:var(--accent);color:var(--accent);white-space:nowrap">+ Rent</button>
+      <button class="btn-back" onclick="goToScreen('reps')" style="margin-top:0;width:auto;padding:14px 16px;border-color:var(--accent);color:var(--accent);white-space:nowrap">+ REPS</button>
     </div>
   </div>
 
@@ -1232,6 +1234,91 @@
 
     <div style="margin-top:auto; padding-top:20px">
       <button class="btn-primary" id="rentSubmitBtn" onclick="submitRent()" disabled>Submit Rent Entry</button>
+      <button class="btn-back" onclick="goToScreen('upload')">← Back</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════ -->
+  <!-- SCREEN: REPS Entry               -->
+  <!-- ══════════════════════════════════ -->
+  <div class="screen" id="screen-reps">
+    <div class="screen-label">REPS Entry</div>
+    <div class="screen-title">Record REPS Activity</div>
+    <div class="screen-sub">Log date, place, time spent, and task to the REPS sheet.</div>
+
+    <div id="repsError" class="error-msg" style="display:none"></div>
+
+    <!-- Date -->
+    <div class="field-wrap">
+      <label class="field-label">Date</label>
+      <div class="field-input-wrap">
+        <input type="text" id="repsDateInput" placeholder="MM/DD/YYYY" inputmode="numeric"
+               oninput="handleRepsDateInput(this.value)" onblur="parseRepsDateInput(this.value)" autocomplete="off" />
+        <button class="field-clear" onclick="clearField('repsDateInput'); REPS_STATE.date=null; checkRepsNext()">×</button>
+      </div>
+    </div>
+    <div class="calendar-wrap" id="repsCalWrap">
+      <div class="cal-header">
+        <button class="cal-nav" onclick="repsCalNav(-1)">‹</button>
+        <div class="cal-month-year" id="repsCalMonthYear"></div>
+        <button class="cal-nav" onclick="repsCalNav(1)">›</button>
+      </div>
+      <div class="cal-grid">
+        <div class="cal-days-header">
+          <div class="cal-day-label">Su</div><div class="cal-day-label">Mo</div>
+          <div class="cal-day-label">Tu</div><div class="cal-day-label">We</div>
+          <div class="cal-day-label">Th</div><div class="cal-day-label">Fr</div>
+          <div class="cal-day-label">Sa</div>
+        </div>
+        <div class="cal-cells" id="repsCalCells"></div>
+      </div>
+    </div>
+
+    <!-- Place -->
+    <div class="field-wrap" style="margin-top:16px">
+      <label class="field-label">Place</label>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px" id="repsPlaceBtns">
+        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Beau Darren',this)">Beau Darren</button>
+        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Briarhurst',this)">Briarhurst</button>
+        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Cornerstone',this)">Cornerstone</button>
+        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Letitia',this)">Letitia</button>
+        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('LN Investments',this)">LN Investments</button>
+        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('LNE Properties',this)">LNE Properties</button>
+        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Portfolio',this)">Portfolio</button>
+        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Parkridge',this)">Parkridge</button>
+        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Rue',this)">Rue</button>
+      </div>
+      <div class="field-input-wrap">
+        <input type="text" id="repsPlaceInput" placeholder="Or type a custom place…"
+               oninput="onRepsPlaceTyped()" />
+        <button class="field-clear" onclick="clearRepsPlace()">×</button>
+      </div>
+    </div>
+
+    <!-- Time Spent -->
+    <div class="field-wrap">
+      <label class="field-label">Time Spent (hours)</label>
+      <div class="field-input-wrap">
+        <input type="text" id="repsTimeInput" placeholder="e.g. 1.5" inputmode="decimal"
+               autocomplete="off" oninput="checkRepsNext()" />
+        <button class="field-clear" onclick="clearField('repsTimeInput'); checkRepsNext()">×</button>
+      </div>
+      <div class="field-hint">Enter decimal hours (e.g. 0.5 = 30 min, 1.5 = 1h 30min)</div>
+    </div>
+
+    <!-- Task -->
+    <div class="field-wrap">
+      <label class="field-label">Task</label>
+      <div class="field-input-wrap" style="align-items:flex-start">
+        <textarea id="repsTaskInput" placeholder="Describe the task performed…"
+          oninput="checkRepsNext()"
+          style="flex:1;background:transparent;border:none;outline:none;color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;font-size:15px;font-weight:400;padding:14px 16px;width:100%;resize:vertical;min-height:80px;"></textarea>
+        <button class="field-clear" onclick="document.getElementById('repsTaskInput').value=''; checkRepsNext()" style="margin-top:10px">×</button>
+      </div>
+    </div>
+
+    <div style="margin-top:auto; padding-top:20px">
+      <button class="btn-primary" id="repsSubmitBtn" onclick="submitReps()" disabled>Submit REPS Entry</button>
       <button class="btn-back" onclick="goToScreen('upload')">← Back</button>
     </div>
   </div>
@@ -1612,11 +1699,12 @@ function saveConfigToStorage(cfg) {
 function getConfig() {
   const stored = loadConfig();
   if (stored) {
-    // Always force hardcoded values — they are the source of truth
-    if (HARDCODED_WEB_APP_URL && !HARDCODED_WEB_APP_URL.includes('PASTE_')) {
+    // Always apply hardcoded values if stored ones are empty
+    // This means existing users also get the URL/key without re-entering
+    if (!stored.webAppUrl && HARDCODED_WEB_APP_URL && !HARDCODED_WEB_APP_URL.includes('PASTE_')) {
       stored.webAppUrl = HARDCODED_WEB_APP_URL;
     }
-    if (HARDCODED_VISION_KEY) {
+    if (!stored.visionApiKey && HARDCODED_VISION_KEY) {
       stored.visionApiKey = HARDCODED_VISION_KEY;
     }
     return stored;
@@ -1941,6 +2029,7 @@ function goToScreen(name) {
   if (name === 'business') { updateBusinessSubtitles(); setTimeout(suggestBusiness, 100); }
   if (name === 'property') { buildPropertyList(); loadPropertyTotals(); }
   if (name === 'rent') { setTimeout(loadRentScreen, 50); }
+  if (name === 'reps') { setTimeout(initRepsScreen, 50); }
   if (name === 'purpose') loadCategories();
   if (name === 'summary') buildSummary();
   if (name === 'success') renderHistory();
@@ -2110,44 +2199,11 @@ function parseReceiptText(text) {
   const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
   const fullText = text;
 
-  // ── VENDOR — store helper is most reliable ──
-  const helperMatch = matchStoreHelper(fullText);
-  if (helperMatch) {
-    STATE.scanned.vendor = helperMatch;
-  } else {
-    // Fall back to first meaningful non-numeric line
-    const skipWords = /receipt|invoice|total|tax|date|amount|thank|welcome|store|purchase|sign|track|rewards|manage|centers|llc|dr\.|baton|rouge|sale|trans|salesperson|subtotal|cashier|terminal/i;
-    for (const line of lines.slice(0, 10)) {
-      if (line.length > 2 && line.length < 35
-          && !skipWords.test(line)
-          && !/^\d/.test(line)
-          && !/^\$/.test(line)
-          && !/^\*/.test(line)
-          && !/^-/.test(line)
-          && !/^#/.test(line)) {
-        STATE.scanned.vendor = line;
-        break;
-      }
-    }
-  }
-
-  // ── CARD LAST 4 — try multiple patterns ──
-  // Order matters — most specific first
-  const cardPatterns = [
-    /x{4,}(\d{4})\s*(?:visa|mc|mastercard|amex|disc)/i,  // XXXXXXXXXXX1326 VISA
-    /x{4,}(\d{4})/i,                                       // XXXXXXXXXXXX4126
-    /(?:visa|mc|mastercard|amex|disc)[^\n]*x{3,}(\d{4})/i, // VISA: XXXX...1326
-    /(?:card|ending|ending in)[^\d]*(\d{4})(?!\d)/i,      // card ending 1326
-  ];
-  for (const pat of cardPatterns) {
-    const m = fullText.match(pat);
-    if (m && m[1]) { STATE.scanned.cardLast4 = m[1]; break; }
-  }
-
-  // ── DATE — collect all candidates, pick best ──
+  // ── Date parsing ──
+  // Collect all date candidates and score them, pick the best
   const dateCandidates = [];
 
-  // MM-DD-YY or MM-DD-YYYY (Lowe's: 04-14-26)
+  // Format 1: MM-DD-YY or MM-DD-YYYY (e.g. 03-08-26)
   const re1 = /(\d{1,2})-(\d{1,2})-(\d{2,4})/g;
   let m1;
   while ((m1 = re1.exec(fullText)) !== null) {
@@ -2155,11 +2211,11 @@ function parseReceiptText(text) {
     if (yr < 100) yr += 2000;
     const mo = parseInt(m1[1]), dy = parseInt(m1[2]);
     if (yr >= 2020 && yr <= 2035 && mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31) {
-      dateCandidates.push({ d: new Date(yr, mo-1, dy), score: 3, src: 'dash' });
+      dateCandidates.push({ d: new Date(yr, mo-1, dy), score: 3 });
     }
   }
 
-  // MM/DD/YY or MM/DD/YYYY (Home Depot: 04/15/26)
+  // Format 2: MM/DD/YY or MM/DD/YYYY (e.g. 03/08/26)
   const re2 = /(\d{1,2})\/(\d{1,2})\/(\d{2,4})/g;
   let m2;
   while ((m2 = re2.exec(fullText)) !== null) {
@@ -2167,80 +2223,93 @@ function parseReceiptText(text) {
     if (yr < 100) yr += 2000;
     const mo = parseInt(m2[1]), dy = parseInt(m2[2]);
     if (yr >= 2020 && yr <= 2035 && mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31) {
-      dateCandidates.push({ d: new Date(yr, mo-1, dy), score: 3, src: 'slash' });
+      dateCandidates.push({ d: new Date(yr, mo-1, dy), score: 3 });
     }
   }
 
-  // YYYY-MM-DD ISO
+  // Format 3: YYYY-MM-DD (ISO)
   const re3 = /(202\d)-(\d{2})-(\d{2})/g;
   let m3;
   while ((m3 = re3.exec(fullText)) !== null) {
     const d = new Date(parseInt(m3[1]), parseInt(m3[2])-1, parseInt(m3[3]));
-    if (!isNaN(d)) dateCandidates.push({ d, score: 4, src: 'iso' });
+    if (!isNaN(d)) dateCandidates.push({ d, score: 4 });
   }
 
-  // Month name
+  // Format 4: Month name (Mar 8, 2026)
   const re4 = /(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\.?\s+(\d{1,2}),?\s+(\d{4})/gi;
   let m4;
   while ((m4 = re4.exec(fullText)) !== null) {
     const d = new Date(m4[0]);
-    if (!isNaN(d)) dateCandidates.push({ d, score: 2, src: 'month' });
+    if (!isNaN(d)) dateCandidates.push({ d, score: 2 });
   }
 
-  // Pick best: filter invalid, sort by score, take first
+  // Pick highest scored valid candidate
+  // Filter out clearly wrong dates (future > 1 year, or before 2020)
   const now = new Date();
-  const valid = dateCandidates.filter(c => {
+  const validCandidates = dateCandidates.filter(c => {
     const yr = c.d.getFullYear();
     return !isNaN(c.d) && yr >= 2020 && yr <= now.getFullYear() + 1;
   });
-  if (valid.length > 0) {
-    valid.sort((a,b) => b.score - a.score);
-    STATE.scanned.date = valid[0].d;
+  if (validCandidates.length > 0) {
+    validCandidates.sort((a,b) => b.score - a.score);
+    STATE.scanned.date = validCandidates[0].d;
   }
 
-  // ── AMOUNT — always negative (expense) ──
-  // Priority 1: VISA/card line total (most reliable — this is what was actually charged)
+  // ── Amount — always negative (expense/charge) ──
+  // Receipt amounts are always positive numbers — we always store as negative
+  // because all scanned receipts are purchases/expenses not refunds
   let foundAmount = null;
 
-  // "VISA: 44.09" or "VISA: $44.09" or "XXXXXXXXXXX1326 VISA ... $87.75"
-  const visaLine = fullText.match(/visa[:\s]+\$?([\d,]+\.\d{2})/i);
-  if (visaLine) foundAmount = parseFloat(visaLine[1].replace(',',''));
-
-  // "USD$ 87.75" or "USD $87.75"
-  if (!foundAmount) {
-    const usdMatch = fullText.match(/usd\$?\s*\$?([\d,]+\.\d{2})/i);
-    if (usdMatch) foundAmount = parseFloat(usdMatch[1].replace(',',''));
+  // Priority 1: Card charge line (VISA: 27.60 or VISA XXXXXXXXX1326 AMOUNT: 27.60)
+  const cardAmountMatch = fullText.match(/(?:visa|mastercard|mc|amex|disc)[^\n]*?([\d,]+\.\d{2})/i);
+  if (cardAmountMatch) {
+    foundAmount = parseFloat(cardAmountMatch[1].replace(',', ''));
   }
 
-  // TOTAL line (not subtotal)
+  // Priority 2: INVOICE TOTAL or TOTAL line
   if (!foundAmount) {
-    const totalMatch = fullText.match(/^\s*(?:invoice\s+\d+\s+)?total[:\s]+\$?([\d,]+\.\d{2})/im);
-    if (totalMatch) foundAmount = parseFloat(totalMatch[1].replace(',',''));
+    const totalMatch = fullText.match(/(?:invoice\s+\d+\s+total|total\s+amount|amount\s+due|balance\s+due)[^\d]*([\d,]+\.\d{2})/i);
+    if (totalMatch) foundAmount = parseFloat(totalMatch[1].replace(',', ''));
   }
 
-  // Largest amount as last resort
+  // Priority 3: Largest amount on receipt
   if (!foundAmount) {
-    const allAmounts = [...fullText.matchAll(/\$([\d,]+\.\d{2})/g)];
-    if (allAmounts.length) {
-      foundAmount = Math.max(...allAmounts.map(m => parseFloat(m[1].replace(',',''))));
+    const amountMatches = [...fullText.matchAll(/\$?\s?([\d,]+\.\d{2})/g)];
+    if (amountMatches.length) {
+      const amounts = amountMatches.map(m => parseFloat(m[1].replace(',', '')));
+      foundAmount = Math.max(...amounts);
     }
   }
 
-  if (foundAmount && foundAmount > 0) {
-    STATE.scanned.amount = -foundAmount; // always negative = expense
+  // Always store as negative — it is always an expense
+  if (foundAmount) {
+    STATE.scanned.amount = -Math.abs(foundAmount);
   }
 
-  // ── DESCRIPTION — first item line ──
-  const itemLines = lines.filter(l =>
-    l.length > 3 && l.length < 35
-    && !/\$/.test(l)
-    && !/^\*/.test(l)
-    && !/^\d{5,}/.test(l)
-    && !/total|subtotal|tax|visa|mastercard|amex|invoice|store|terminal/i.test(l)
-  ).slice(3, 8);
+  // ── Vendor — store helper first, then first meaningful line near top ──
+  // matchStoreHelper scans the full OCR text for known store keywords,
+  // which is more reliable than guessing from the first line.
+  const helperMatch = matchStoreHelper(fullText);
+  if (helperMatch) {
+    STATE.scanned.vendor = helperMatch;
+  } else {
+    const skipWords = /receipt|invoice|total|tax|date|amount|thank|welcome|store|purchase|sign|track|rewards|manage|centers|llc|dr\.|baton|rouge|sale|trans|salesperson/i;
+    for (const line of lines.slice(0, 12)) {
+      if (line.length > 2 && line.length < 35 && !skipWords.test(line) && !/^\d/.test(line) && !/^\$/.test(line) && !/^\*/.test(line) && !/^-/.test(line)) {
+        STATE.scanned.vendor = line;
+        break;
+      }
+    }
+  }
+
+  // ── Card last 4 ──
+  const cardMatch = fullText.match(/(?:visa|mc|mastercard|amex|disc|card|xxxx|ending|x{4})[^\d]*(\d{4})/i);
+  if (cardMatch) STATE.scanned.cardLast4 = cardMatch[1];
+
+  // ── Description — first item line ──
+  const itemLines = lines.filter(l => l.length > 3 && l.length < 30 && !/\$/.test(l) && !/^\*/.test(l) && !/^\d{5,}/.test(l)).slice(3, 7);
   if (itemLines.length) STATE.scanned.description = itemLines[0].substring(0, 20);
 }
-
 
 
 // ════════════════════════════════════════════
@@ -3400,8 +3469,200 @@ window.addEventListener('DOMContentLoaded', () => {
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <script>
 // ════════════════════════════════════════════
-// OVERVIEW + CHARTS
+// REPS ENTRY
 // ════════════════════════════════════════════
+const REPS_STATE = {
+  date: null,
+  calYear: new Date().getFullYear(),
+  calMonth: new Date().getMonth(),
+};
+
+function initRepsScreen() {
+  const errEl = document.getElementById('repsError');
+  if (errEl) errEl.style.display = 'none';
+
+  // Clear place button highlights on fresh open
+  document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected'));
+
+  // Default to today if no date set
+  if (!REPS_STATE.date) {
+    const today = new Date();
+    REPS_STATE.date = today;
+    REPS_STATE.calYear = today.getFullYear();
+    REPS_STATE.calMonth = today.getMonth();
+    document.getElementById('repsDateInput').value =
+      (today.getMonth()+1) + '/' + today.getDate() + '/' + today.getFullYear();
+  }
+  renderRepsCalendar();
+  checkRepsNext();
+}
+
+function handleRepsDateInput(val) {
+  const digits = val.replace(/\D/g, '');
+  let fmt = digits;
+  if (digits.length > 2) fmt = digits.substring(0,2) + '/' + digits.substring(2);
+  if (digits.length > 4) fmt = digits.substring(0,2) + '/' + digits.substring(2,4) + '/' + digits.substring(4,8);
+  const input = document.getElementById('repsDateInput');
+  if (fmt !== val) input.value = fmt;
+  parseRepsDateInput(fmt);
+}
+
+function parseRepsDateInput(val) {
+  const parts = val.split('/');
+  if (parts.length === 3) {
+    const mo = parseInt(parts[0]), dy = parseInt(parts[1]);
+    let yr = parseInt(parts[2]);
+    if (yr < 100) yr += 2000;
+    if (mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31 && yr >= 2020 && yr <= 2035) {
+      const d = new Date(yr, mo-1, dy);
+      if (!isNaN(d)) {
+        REPS_STATE.date = d;
+        REPS_STATE.calYear = yr;
+        REPS_STATE.calMonth = mo - 1;
+        renderRepsCalendar();
+        checkRepsNext();
+      }
+    }
+  }
+}
+
+function repsCalNav(dir) {
+  REPS_STATE.calMonth += dir;
+  if (REPS_STATE.calMonth > 11) { REPS_STATE.calMonth = 0; REPS_STATE.calYear++; }
+  if (REPS_STATE.calMonth < 0)  { REPS_STATE.calMonth = 11; REPS_STATE.calYear--; }
+  renderRepsCalendar();
+}
+
+function renderRepsCalendar() {
+  const months = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+  document.getElementById('repsCalMonthYear').textContent =
+    months[REPS_STATE.calMonth] + ' ' + REPS_STATE.calYear;
+
+  const cells = document.getElementById('repsCalCells');
+  cells.innerHTML = '';
+  const firstDay = new Date(REPS_STATE.calYear, REPS_STATE.calMonth, 1).getDay();
+  const daysInMonth = new Date(REPS_STATE.calYear, REPS_STATE.calMonth + 1, 0).getDate();
+  const today = new Date();
+
+  for (let i = 0; i < firstDay; i++) {
+    const el = document.createElement('div');
+    el.className = 'cal-cell empty';
+    cells.appendChild(el);
+  }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const el = document.createElement('div');
+    el.className = 'cal-cell';
+    el.textContent = d;
+    const cellDate = new Date(REPS_STATE.calYear, REPS_STATE.calMonth, d);
+    if (today.toDateString() === cellDate.toDateString()) el.classList.add('today');
+    if (REPS_STATE.date && REPS_STATE.date.toDateString() === cellDate.toDateString()) el.classList.add('selected');
+    el.onclick = () => {
+      REPS_STATE.date = new Date(REPS_STATE.calYear, REPS_STATE.calMonth, d);
+      document.getElementById('repsDateInput').value =
+        (REPS_STATE.calMonth+1) + '/' + d + '/' + REPS_STATE.calYear;
+      renderRepsCalendar();
+      checkRepsNext();
+    };
+    cells.appendChild(el);
+  }
+}
+
+function selectRepsPlace(name, btn) {
+  document.getElementById('repsPlaceInput').value = name;
+  document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+  checkRepsNext();
+}
+
+function onRepsPlaceTyped() {
+  // Deselect all place buttons when user types a custom value
+  document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected'));
+  checkRepsNext();
+}
+
+function clearRepsPlace() {
+  document.getElementById('repsPlaceInput').value = '';
+  document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected'));
+  checkRepsNext();
+}
+
+
+  const hasDate  = !!REPS_STATE.date;
+  const hasPlace = document.getElementById('repsPlaceInput').value.trim().length > 0;
+  const timeVal  = parseFloat(document.getElementById('repsTimeInput').value);
+  const hasTime  = !isNaN(timeVal) && timeVal > 0;
+  const hasTask  = document.getElementById('repsTaskInput').value.trim().length > 0;
+  document.getElementById('repsSubmitBtn').disabled = !(hasDate && hasPlace && hasTime && hasTask);
+}
+
+async function submitReps() {
+  const btn = document.getElementById('repsSubmitBtn');
+  const errEl = document.getElementById('repsError');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  errEl.style.display = 'none';
+
+  const d = REPS_STATE.date;
+  const dateStr = d.getFullYear() + '-' +
+    String(d.getMonth()+1).padStart(2,'0') + '-' +
+    String(d.getDate()).padStart(2,'0');
+
+  const payload = {
+    action: 'addReps',
+    date: dateStr,
+    place: document.getElementById('repsPlaceInput').value.trim(),
+    timeSpent: parseFloat(document.getElementById('repsTimeInput').value),
+    task: document.getElementById('repsTaskInput').value.trim()
+  };
+
+  try {
+    const resp = await fetch(CFG.webAppUrl, {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+    const data = await resp.json();
+    if (data.error) throw new Error(data.error);
+
+    // Add to session history
+    addToHistory({
+      type: 'reps',
+      vendor: payload.place,
+      property: payload.place,
+      purpose: 'REPS',
+      amount: 0,
+      description: payload.task.substring(0, 30),
+      date: dateStr,
+      row: data.row,
+      tab: 'REPS',
+      timestamp: new Date().toISOString()
+    });
+
+    // Show success
+    document.getElementById('successDetail').innerHTML =
+      `REPS entry recorded in <strong>REPS sheet</strong><br>` +
+      `${payload.place} &middot; ${payload.timeSpent}h &middot; ` +
+      `<span style="color:var(--text-muted);font-size:12px">${payload.task.substring(0,40)}${payload.task.length>40?'…':''}</span>`;
+    document.getElementById('driveStatus').style.display = 'none';
+
+    // Reset REPS form
+    REPS_STATE.date = null;
+    document.getElementById('repsDateInput').value = '';
+    document.getElementById('repsPlaceInput').value = '';
+    document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected'));
+    document.getElementById('repsTimeInput').value = '';
+    document.getElementById('repsTaskInput').value = '';
+
+    goToScreen('success');
+  } catch(err) {
+    btn.disabled = false;
+    btn.textContent = 'Submit REPS Entry';
+    errEl.textContent = 'Failed: ' + err.message;
+    errEl.style.display = 'block';
+  }
+}
+
+
 
 const OVERVIEW_PALETTE = [
   '#c8a96e','#5ab882','#6ea8c8','#c86e9a','#a8c86e','#c8956e','#6e78c8','#e8c98e',
