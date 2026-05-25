@@ -3587,7 +3587,7 @@ function clearRepsPlace() {
   checkRepsNext();
 }
 
-
+function checkRepsNext() {
   const hasDate  = !!REPS_STATE.date;
   const hasPlace = document.getElementById('repsPlaceInput').value.trim().length > 0;
   const timeVal  = parseFloat(document.getElementById('repsTimeInput').value);
