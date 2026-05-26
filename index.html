@@ -2657,12 +2657,21 @@ function getDateStr() {
 
 function getPropertyAbbr() {
   if (STATE.isBusinessExpense) return STATE.business;
-  const overrides = CFG.propertyAbbreviations || {};
-  if (overrides[STATE.property]) return overrides[STATE.property];
-  // Auto-generate from initials
+  const userOverrides = CFG.propertyAbbreviations || {};
+  if (userOverrides[STATE.property]) return userOverrides[STATE.property];
+
+  const defaults = {
+    'Letitia':              'Let',
+    'Cornerstone':          'CS',
+    'Parkridge':            'PR',
+    'Beau Darren':          'BD',
+    'Briarhurst':           'BH',
+    'Rue De Belle Maison':  'RDB',
+  };
+  if (defaults[STATE.property]) return defaults[STATE.property];
+
   return (STATE.property || '').split(/\s+/).map(w => w.charAt(0).toUpperCase()).join('');
 }
-
 async function submitEntry() {
   const btn = document.getElementById('submitBtn');
   const errEl = document.getElementById('submitError');
