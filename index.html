@@ -3468,6 +3468,14 @@ function resetApp() {
 // INIT
 // ════════════════════════════════════════════
 window.addEventListener('DOMContentLoaded', () => {
+  // Always force the hardcoded URL — clears any stale cached URL
+  if (HARDCODED_WEB_APP_URL && !HARDCODED_WEB_APP_URL.includes('PASTE_')) {
+    const stored = loadConfig();
+    if (stored && stored.webAppUrl !== HARDCODED_WEB_APP_URL) {
+      stored.webAppUrl = HARDCODED_WEB_APP_URL;
+      saveConfigToStorage(stored);
+    }
+  }
   CFG = getConfig();
   // Only render calendar if the element is present (it lives inside the date screen)
   if (document.getElementById('calMonthYear')) renderCalendar();
