@@ -3525,7 +3525,7 @@ async function loadGrassCut() {
       return;
     }
     data.properties.forEach(p => {
-      const days = p.days !== null ? Number(p.days) : null;
+      const days = p.days !== null ? Math.round(Number(p.days)) : null;
       const isNull = days === null || isNaN(days);
       const urgent = !isNull && days >= 10;
       const warning = !isNull && days >= 7 && days < 10;
