@@ -1601,7 +1601,7 @@ window.onerror = function(msg, src, line, col, err) {
 // ════════════════════════════════════════════
 // HARDCODED CONFIG — shared for all users
 // ════════════════════════════════════════════
-const HARDCODED_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbzunFqBMn82NpK9Y3R8hO9LBJb3SHLh4VgXKMAe4DNqAvkXyBRBSlZzh-uy7CcH---0ew/exec';
+const HARDCODED_WEB_APP_URL = 'https://script.google.com/macros/s/AKfycbxh0OjXgbPjEtZKuTqu-wYNu3E7xaIO6g-vNINsbsRDGEjrcUNRjt3F8d7QvvD7zHpwIQ/exec';
 const HARDCODED_VISION_KEY  = 'AIzaSyANA15O0FPREaFOIN5xXszhXlXHapP9Q0Y';
 
 // ════════════════════════════════════════════
@@ -1719,7 +1719,7 @@ function getConfig() {
   if (stored) {
     // Always apply hardcoded values if stored ones are empty
     // This means existing users also get the URL/key without re-entering
-    if (!stored.webAppUrl && HARDCODED_WEB_APP_URL && !HARDCODED_WEB_APP_URL.includes('PASTE_')) {
+    if (HARDCODED_WEB_APP_URL && !HARDCODED_WEB_APP_URL.includes('PASTE_')) {
       stored.webAppUrl = HARDCODED_WEB_APP_URL;
     }
     if (!stored.visionApiKey && HARDCODED_VISION_KEY) {
