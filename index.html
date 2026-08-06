@@ -2526,7 +2526,8 @@ async function loadCategories() {
   const loading = document.getElementById('purposeLoading');
   const errEl = document.getElementById('purposeError');
   if (!STATE.business) return;
-  if (grid.dataset.loadedFor === STATE.business) return;
+  const loadKey = STATE.business + ':' + STATE.isBusinessExpense;
+  if (grid.dataset.loadedFor === loadKey) return;
   grid.innerHTML = '';
   grid.dataset.loadedFor = '';
   loading.style.display = 'flex';
@@ -2537,7 +2538,8 @@ async function loadCategories() {
     const catParams = new URLSearchParams({
       action: 'getCategories',
       business: STATE.business,
-      year: year
+      year: year,
+      isBusinessExpense: STATE.isBusinessExpense
     });
     const resp = await fetch(CFG.webAppUrl + '?' + catParams.toString(), {
       method: 'GET'
@@ -2545,7 +2547,7 @@ async function loadCategories() {
     const data = await resp.json();
     if (data.error) throw new Error(data.error);
     loading.style.display = 'none';
-    grid.dataset.loadedFor = STATE.business;
+    grid.dataset.loadedFor = loadKey;
     buildCategoryGrid(data.categories);
   } catch (err) {
     loading.style.display = 'none';
