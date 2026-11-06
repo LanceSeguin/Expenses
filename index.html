@@ -2364,16 +2364,25 @@ function suggestBusiness() {
 function buildPropertyList() {
   const list = document.getElementById('propertyList');
   list.innerHTML = '';
-  const props = CFG[STATE.business] ? CFG[STATE.business].props : [];
+  
+  // Prefer live names from the sheet cache if available, fallback to CFG
+  let props = [];
+  if (propertyTotalsCache && propertyTotalsCache._business === STATE.business) {
+    props = Object.keys(propertyTotalsCache).filter(k => !k.startsWith('_'));
+  }
+  if (!props.length) {
+    props = CFG[STATE.business] ? CFG[STATE.business].props : [];
+  }
+
   if (!props.length) {
     list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:16px 0">No properties configured. Open Settings ⚙ to add some.</div>';
     return;
   }
+  
   props.forEach(p => {
     const card = document.createElement('div');
     card.className = 'checkbox-card' + (STATE.property === p ? ' selected' : '');
 
-    // Build total badge if available
     let totalBadge = '';
     if (propertyTotalsCache && propertyTotalsCache[p] !== undefined) {
       const total = propertyTotalsCache[p];
@@ -2396,7 +2405,6 @@ function buildPropertyList() {
     list.appendChild(card);
   });
 }
-
 // ════════════════════════════════════════════
 // VENDOR
 // ════════════════════════════════════════════
