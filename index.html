@@ -3817,8 +3817,8 @@ async function loadOverviewData() {
   try {
     // Fetch both businesses in parallel
     const [lniResp, lnepResp] = await Promise.all([
-      fetch(CFG.webAppUrl + '?action=getOverviewTotals&year=' + overviewYear + '&business=LNI'),
-      fetch(CFG.webAppUrl + '?action=getOverviewTotals&year=' + overviewYear + '&business=LNEP')
+      fetch(CFG.webAppUrl + '?action=getOverviewTotals&year=' + overviewYear + '&business=LNI&_t=' + Date.now()),
+      fetch(CFG.webAppUrl + '?action=getOverviewTotals&year=' + overviewYear + '&business=LNEP&_t=' + Date.now())
     ]);
     const lniData  = await lniResp.json();
     const lnepData = await lnepResp.json();
