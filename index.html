@@ -3388,13 +3388,8 @@ async function loadPropertyTotals() {
     const resp = await fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year + '&business=' + STATE.business);
     const data = await resp.json();
     if (!data.error) {
-  // Auto-add any property the sheet knows about but the app doesn't
-  Object.keys(data.totals).forEach(name => {
-    if (!CFG[STATE.business].props.includes(name)) {
-      CFG[STATE.business].props.push(name);
-    }
-  });
-  persistCFG();
+        const names = Object.keys(data.totals);
+      if (names.length) { CFG[STATE.business].props = names; persistCFG(); }
   propertyTotalsCache = data.totals;
   propertyTotalsCache._business = STATE.business;
   rebuildPropertyListWithTotals();
@@ -3410,7 +3405,20 @@ function rebuildPropertyListWithTotals() {
   // Re-render property list with totals
   buildPropertyList();
 }
-
+// Pulls the property list from the sheet so every device stays in sync
+async function syncPropertiesFromSheet() {
+  const year = new Date().getFullYear();
+  for (const biz of ['LNI', 'LNEP']) {
+    try {
+      const resp = await fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year + '&business=' + biz);
+      const data = await resp.json();
+      if (data.error || !data.totals) continue;
+      const names = Object.keys(data.totals);
+      if (names.length) CFG[biz].props = names;
+    } catch(e) { /* offline: keep the last known list */ }
+  }
+  persistCFG();
+}
 // ════════════════════════════════════════════
 // HELPERS
 // ════════════════════════════════════════════
@@ -3507,6 +3515,7 @@ window.addEventListener('DOMContentLoaded', () => {
   } else {
     document.getElementById('settingsOpenBtn').style.display = 'flex';
     goToScreen('upload');
+    syncPropertiesFromSheet();
   }
 });
 
