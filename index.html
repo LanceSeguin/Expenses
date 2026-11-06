@@ -3388,10 +3388,17 @@ async function loadPropertyTotals() {
     const resp = await fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year + '&business=' + STATE.business);
     const data = await resp.json();
     if (!data.error) {
-      propertyTotalsCache = data.totals;
-      propertyTotalsCache._business = STATE.business; // Store which biz these totals belong to
-      rebuildPropertyListWithTotals();
+  // Auto-add any property the sheet knows about but the app doesn't
+  Object.keys(data.totals).forEach(name => {
+    if (!CFG[STATE.business].props.includes(name)) {
+      CFG[STATE.business].props.push(name);
     }
+  });
+  persistCFG();
+  propertyTotalsCache = data.totals;
+  propertyTotalsCache._business = STATE.business;
+  rebuildPropertyListWithTotals();
+}
   } catch(e) {
     console.error("Failed to load totals:", e);
   }
