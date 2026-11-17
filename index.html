@@ -11,7 +11,7 @@
 // (Change these here once, and they update everywhere)
 // ⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️
 
-const APP_VERSION = "V2.0"; 
+const APP_VERSION = "V3.0"; 
 
 // 1. Untouched Expense & Financial Apps Script
 const HARDCODED_WEB_APP_URL    = 'https://script.google.com/macros/s/AKfycbzFxYt4-H2zZuZFxIZYaowpkuvIo8iKqckpJaAGco6lAVIox8m8Kxw1dxfL6TwgZ1Mblg/exec';
@@ -359,43 +359,63 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
   </div>
 
   <!-- ══════════════════════════════════ -->
-  <!-- SCREEN: COMMAND CENTER HUB         -->
+  <!-- SCREEN: COMMAND CENTER HUB (4-BTN) -->
   <!-- ══════════════════════════════════ -->
   <div class="screen" id="screen-hub">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
       <div class="screen-label" style="margin-bottom:0">Portfolio Command Center</div>
       <button onclick="refreshCommandCenter(true)" style="background:transparent;border:none;color:var(--accent);font-size:11px;font-weight:600;cursor:pointer;letter-spacing:0.06em;text-transform:uppercase;">↻ Sync</button>
     </div>
-    <div class="screen-title">Operations Hub</div>
-    <div class="screen-sub" id="hubStatusLine">Live overview across leases, maintenance, and accounting.</div>
+    <div class="screen-title">Command Center</div>
+    <div class="screen-sub" id="hubStatusLine">Select a workspace below.</div>
 
-    <!-- Top Live KPI Cards -->
-    <div class="hub-kpi-grid">
-      <div class="hub-kpi-card" onclick="goToScreen('workorders')">
-        <div class="hub-kpi-label">Work Orders</div>
-        <div class="hub-kpi-val" id="hubWoCount">—</div>
-        <div class="hub-kpi-sub" id="hubWoSub">Loading tickets…</div>
+    <div class="hub-module-list">
+      <div class="hub-module-card" onclick="goToScreen('entry-hub')" style="padding:18px 18px;">
+        <div class="hub-module-icon" style="width:46px;height:46px;font-size:22px;">🧾</div>
+        <div class="hub-module-info">
+          <div class="hub-module-title" style="font-size:16px;">Expense / Rent Entry</div>
+          <div class="hub-module-desc">Receipts, rent payments, REPS &amp; grass cut logs</div>
+        </div>
+        <div class="hub-module-arrow">›</div>
       </div>
-      <div class="hub-kpi-card" onclick="goToScreen('leases')">
-        <div class="hub-kpi-label">Leases &amp; Renewals</div>
-        <div class="hub-kpi-val" id="hubLeaseCount">—</div>
-        <div class="hub-kpi-sub" id="hubLeaseSub">Loading leases…</div>
+
+      <div class="hub-module-card" onclick="goToScreen('add-property')" style="padding:18px 18px;">
+        <div class="hub-module-icon" style="width:46px;height:46px;font-size:22px;">🏘️</div>
+        <div class="hub-module-info">
+          <div class="hub-module-title" style="font-size:16px;">Add Property</div>
+          <div class="hub-module-desc" id="hubPropCountSub">Add new doors &amp; manage Property Master</div>
+        </div>
+        <div class="hub-module-arrow">›</div>
+      </div>
+
+      <div class="hub-module-card" onclick="goToScreen('metrics')" style="padding:18px 18px;">
+        <div class="hub-module-icon" style="width:46px;height:46px;font-size:22px;">🛠️</div>
+        <div class="hub-module-info">
+          <div class="hub-module-title" style="font-size:16px;">Property Metrics</div>
+          <div class="hub-module-desc" id="hubMetricsSub">Work orders, lease renewals &amp; equipment specs</div>
+        </div>
+        <div class="hub-module-arrow">›</div>
+      </div>
+
+      <div class="hub-module-card" onclick="goToScreen('overview')" style="padding:18px 18px;">
+        <div class="hub-module-icon" style="width:46px;height:46px;font-size:22px;">📈</div>
+        <div class="hub-module-info">
+          <div class="hub-module-title" style="font-size:16px;">Financials</div>
+          <div class="hub-module-desc" id="hubNetSub">Property P&amp;L, portfolio totals &amp; expense charts</div>
+        </div>
+        <div class="hub-module-arrow">›</div>
       </div>
     </div>
+  </div>
 
-    <!-- Combined Financial Banner -->
-    <div class="hub-banner" onclick="goToScreen('overview')">
-      <div>
-        <div style="font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text-dim);margin-bottom:4px;">YTD Combined Net P&amp;L</div>
-        <div id="hubNetPnl" style="font-family:Georgia,serif;font-size:24px;color:var(--success);">—</div>
-      </div>
-      <div style="text-align:right;">
-        <div style="font-size:12px;font-weight:600;color:var(--accent);">P&amp;L &amp; Charts →</div>
-        <div style="font-size:11px;color:var(--text-muted);margin-top:2px;" id="hubNetSub">Tap for breakdown</div>
-      </div>
-    </div>
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SCREEN: EXPENSE / RENT / LOG ENTRY HUB     -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-entry-hub">
+    <div class="screen-label">Bookkeeping &amp; Field Logs</div>
+    <div class="screen-title">Expense &amp; Rent Entry</div>
+    <div class="screen-sub">Record expenses, tenant rent payments, REPS hours, and lawn tracking.</div>
 
-    <!-- Financial & Field Entry Modules -->
     <div class="hub-section-title">Bookkeeping &amp; Field Logs</div>
     <div class="hub-module-list" style="margin-bottom:12px;">
       <div class="hub-module-card" onclick="goToScreen('upload')">
@@ -423,8 +443,114 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
       </button>
     </div>
 
-    <!-- Property Operations Modules -->
-    <div class="hub-section-title">Property Operations (AI Manager)</div>
+    <div style="margin-top:auto;padding-top:16px">
+      <button class="btn-back" onclick="goToScreen('hub')">← Back to Command Center</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SCREEN: ADD PROPERTY & MASTER PORTFOLIO    -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-add-property">
+    <div class="screen-label">Portfolio Database</div>
+    <div class="screen-title">Add Property</div>
+    <div class="screen-sub">Add a new door to Property Master. It will automatically sync across all dropdowns and scripts.</div>
+
+    <div id="addPropSuccess" class="success-msg" style="display:none">✓ Property added to Property Master!</div>
+    <div id="addPropError" class="error-msg" style="display:none"></div>
+
+    <div class="two-col-grid">
+      <div class="field-wrap">
+        <label class="field-label">Short Display Name</label>
+        <div class="field-input-wrap">
+          <input type="text" id="newPropName" placeholder="e.g. Rue, Oakwood" />
+        </div>
+      </div>
+      <div class="field-wrap">
+        <label class="field-label">PDF Code (Abbr)</label>
+        <div class="field-input-wrap">
+          <input type="text" id="newPropAbbr" placeholder="e.g. RDB" maxlength="6" style="text-transform:uppercase" />
+        </div>
+      </div>
+    </div>
+
+    <div class="field-wrap">
+      <label class="field-label">Full Physical Address</label>
+      <div class="field-input-wrap">
+        <input type="text" id="newPropAddress" placeholder="e.g. 4352 Rue De Belle Maison, Unit A, Baton Rouge, LA 70809" />
+      </div>
+    </div>
+
+    <div class="two-col-grid">
+      <div class="field-wrap">
+        <label class="field-label">Business Entity</label>
+        <div class="field-input-wrap">
+          <select id="newPropBiz">
+            <option value="LNI">LNI (LN Investments)</option>
+            <option value="LNEP">LNEP (LNE Properties)</option>
+          </select>
+        </div>
+      </div>
+      <div class="field-wrap">
+        <label class="field-label">Rental Type</label>
+        <div class="field-input-wrap">
+          <select id="newPropType">
+            <option value="Long-Term">Long-Term</option>
+            <option value="Short-Term">Short-Term</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="two-col-grid">
+      <div class="field-wrap">
+        <label class="field-label">Baseline Rent</label>
+        <div class="field-input-wrap">
+          <input type="tel" id="newPropRent" placeholder="$0.00" onfocus="cleanRentInput(this)" onblur="formatRentInput(this)" />
+        </div>
+      </div>
+      <div class="field-wrap">
+        <label class="field-label">Notes (Optional)</label>
+        <div class="field-input-wrap">
+          <input type="text" id="newPropNotes" placeholder="e.g. Duplex, 2bd/1ba" />
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="saveNewPropBtn" onclick="submitNewProperty()" style="margin-top:4px;margin-bottom:24px;">+ Save Property to Master</button>
+
+    <div class="hub-section-title">Active Portfolio (<span id="masterPropListCount">0</span>)</div>
+    <div id="masterPropListLoading" class="loading-cats" style="display:none"><div class="mini-spinner"></div> Loading Property Master…</div>
+    <div id="masterPropList" style="margin-bottom:16px;"></div>
+
+    <div style="margin-top:auto;padding-top:16px">
+      <button class="btn-back" onclick="goToScreen('hub')">← Back to Command Center</button>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- SCREEN: PROPERTY METRICS & OPERATIONS      -->
+  <!-- ══════════════════════════════════════════ -->
+  <div class="screen" id="screen-metrics">
+    <div class="screen-label">Operations &amp; Reports</div>
+    <div class="screen-title">Property Metrics</div>
+    <div class="screen-sub">Live work orders, lease renewals, and property equipment specs.</div>
+
+    <!-- Top Live KPI Cards -->
+    <div class="hub-kpi-grid">
+      <div class="hub-kpi-card" onclick="goToScreen('workorders')">
+        <div class="hub-kpi-label">Work Orders</div>
+        <div class="hub-kpi-val" id="hubWoCount">—</div>
+        <div class="hub-kpi-sub" id="hubWoSub">Loading tickets…</div>
+      </div>
+      <div class="hub-kpi-card" onclick="goToScreen('leases')">
+        <div class="hub-kpi-label">Leases &amp; Renewals</div>
+        <div class="hub-kpi-val" id="hubLeaseCount">—</div>
+        <div class="hub-kpi-sub" id="hubLeaseSub">Loading leases…</div>
+      </div>
+    </div>
+
+    <div class="hub-section-title">Operations &amp; Reports</div>
     <div class="hub-module-list">
       <div class="hub-module-card" onclick="goToScreen('workorders')">
         <div class="hub-module-icon">🛠️</div>
@@ -453,6 +579,10 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
         <div class="hub-module-arrow">›</div>
       </div>
     </div>
+
+    <div style="margin-top:auto;padding-top:16px">
+      <button class="btn-back" onclick="goToScreen('hub')">← Back to Command Center</button>
+    </div>
   </div>
 
   <!-- ══════════════════════════════════ -->
@@ -479,7 +609,7 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     <div id="woList"></div>
 
     <div style="margin-top:auto;padding-top:16px">
-      <button class="btn-back" onclick="goToScreen('hub')">← Back to Command Center</button>
+      <button class="btn-back" onclick="goToScreen('metrics')">← Back to Property Metrics</button>
     </div>
   </div>
 
@@ -507,7 +637,7 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     <div id="leaseList"></div>
 
     <div style="margin-top:auto;padding-top:16px">
-      <button class="btn-back" onclick="goToScreen('hub')">← Back to Command Center</button>
+      <button class="btn-back" onclick="goToScreen('metrics')">← Back to Property Metrics</button>
     </div>
   </div>
 
@@ -530,7 +660,7 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     <div id="specsList"></div>
 
     <div style="margin-top:auto;padding-top:16px">
-      <button class="btn-back" onclick="goToScreen('hub')">← Back to Command Center</button>
+      <button class="btn-back" onclick="goToScreen('metrics')">← Back to Property Metrics</button>
     </div>
   </div>
 
@@ -594,7 +724,7 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
 
     <div style="margin-top:auto; padding-top:20px">
       <button class="btn-primary" id="uploadNextBtn" onclick="goToScreen('business')" disabled>Continue with Expense</button>
-      <button class="btn-back" onclick="goToScreen('hub')" style="margin-top:10px;">← Back to Command Center</button>
+      <button class="btn-back" onclick="goToScreen('entry-hub')" style="margin-top:10px;">← Back to Entry Hub</button>
     </div>
   </div>
 
@@ -691,7 +821,7 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
 
     <div id="chartsLegend" style="background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);padding:14px 18px;margin-bottom:14px;display:flex;flex-direction:column;gap:9px;"></div>
 
-    <button class="btn-back" onclick="goToScreen('overview')" style="margin-top:4px;">← Back to Overview</button>
+    <button class="btn-back" onclick="goToScreen('overview')" style="margin-top:4px;">← Back to Financials</button>
   </div>
 
   <!-- ══════════════════════════════════ -->
@@ -969,7 +1099,7 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     </div>
     <div style="margin-top:auto; padding-top:20px">
       <button class="btn-primary" id="rentSubmitBtn" onclick="submitRent()" disabled>Submit Rent Entry</button>
-      <button class="btn-back" onclick="goToScreen('hub')">← Back to Command Center</button>
+      <button class="btn-back" onclick="goToScreen('entry-hub')">← Back to Entry Hub</button>
     </div>
   </div>
 
@@ -1025,7 +1155,7 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     </div>
     <div style="margin-top:auto; padding-top:20px">
       <button class="btn-primary" id="repsSubmitBtn" onclick="submitReps()" disabled>Submit REPS Entry</button>
-      <button class="btn-back" onclick="goToScreen('hub')">← Back to Command Center</button>
+      <button class="btn-back" onclick="goToScreen('entry-hub')">← Back to Entry Hub</button>
     </div>
   </div>
 
@@ -1040,12 +1170,11 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     <div id="grasscutLoading" style="text-align:center;padding:40px 0;color:var(--text-muted);font-size:15px;">Loading…</div>
     <div id="grasscutList" style="display:none;flex-direction:column;gap:10px"></div>
     <div style="margin-top:auto;padding-top:24px">
-      <button class="btn-back" onclick="goToScreen('hub')">← Back to Command Center</button>
+      <button class="btn-back" onclick="goToScreen('entry-hub')">← Back to Entry Hub</button>
     </div>
   </div>
 
 </div><!-- /#app -->
-
 
 <!-- ══════════════════════════════════════════════════════════ -->
 <!-- MODAL: WORK ORDER DETAIL & OPERATIONS                      -->
@@ -1286,12 +1415,7 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     <div class="sett-section"><div class="sett-section-header"><div class="sett-section-icon">💳</div><div><div class="sett-section-title">LN Investments — Card Numbers</div></div></div><div class="tag-list" id="tags-LNI-cards"></div><div class="add-row"><input class="add-input" type="text" id="add-LNI-cards" placeholder="Last 4 digits" maxlength="4" onkeydown="if(event.key==='Enter') addTag('LNI','cards')" /><button class="add-btn" onclick="addTag('LNI','cards')">Add</button></div></div>
     <div class="sett-section"><div class="sett-section-header"><div class="sett-section-icon">💳</div><div><div class="sett-section-title">LNE Properties — Card Numbers</div></div></div><div class="tag-list" id="tags-LNEP-cards"></div><div class="add-row"><input class="add-input" type="text" id="add-LNEP-cards" placeholder="Last 4 digits" maxlength="4" onkeydown="if(event.key==='Enter') addTag('LNEP','cards')" /><button class="add-btn" onclick="addTag('LNEP','cards')">Add</button></div></div>
     <div class="sett-divider"></div>
-    <div class="sett-section"><div class="sett-section-header"><div class="sett-section-icon">🏠</div><div><div class="sett-section-title">LN Investments — Properties</div></div></div><div class="tag-list" id="tags-LNI-props"></div><div class="add-row"><input class="add-input" type="text" id="add-LNI-props" placeholder="Property name" onkeydown="if(event.key==='Enter') addTag('LNI','props')" /><button class="add-btn" onclick="addTag('LNI','props')">Add</button></div></div>
-    <div class="sett-section"><div class="sett-section-header"><div class="sett-section-icon">🏠</div><div><div class="sett-section-title">LNE Properties — Properties</div></div></div><div class="tag-list" id="tags-LNEP-props"></div><div class="add-row"><input class="add-input" type="text" id="add-LNEP-props" placeholder="Property name" onkeydown="if(event.key==='Enter') addTag('LNEP','props')" /><button class="add-btn" onclick="addTag('LNEP','props')">Add</button></div></div>
-    <div class="sett-divider"></div>
     <div class="sett-section"><div class="sett-section-header"><div class="sett-section-icon">👁️</div><div><div class="sett-section-title">Vision API Key</div></div></div><div id="settVisionSuccess" class="success-msg" style="display:none">✓ API key saved</div><div class="url-row"><input class="url-input" type="text" id="settVisionKey" placeholder="AIzaSy..." /><button class="url-save-btn" onclick="saveVisionKey()">Save</button></div></div>
-    <div class="sett-divider"></div>
-    <div class="sett-section"><div class="sett-section-header"><div class="sett-section-icon">🏷️</div><div><div class="sett-section-title">Property Abbreviations</div></div></div><div id="propAbbrList" style="margin-bottom:10px"></div><div class="add-row" style="gap:6px"><input class="add-input" type="text" id="abbrPropName" placeholder="Property name" style="flex:2" /><input class="add-input" type="text" id="abbrPropVal" placeholder="Abbr" maxlength="6" style="flex:1;text-transform:uppercase" /><button class="add-btn" onclick="addPropAbbr()">Set</button></div></div>
     <div class="sett-divider"></div>
     <div class="sett-section"><div class="sett-section-header"><div class="sett-section-icon">🏪</div><div><div class="sett-section-title">Store Name Helpers</div></div></div><div id="storeHelperList" style="margin-bottom:10px"></div><div class="add-row" style="gap:6px"><input class="add-input" type="text" id="storeHelperKw" placeholder="Keyword on receipt" style="flex:2" onkeydown="if(event.key==='Enter') addStoreHelper()" /><input class="add-input" type="text" id="storeHelperName" placeholder="Store name" style="flex:2" onkeydown="if(event.key==='Enter') addStoreHelper()" /><button class="add-btn" onclick="addStoreHelper()">Add</button></div></div>
     <div class="sett-divider"></div>
@@ -1302,13 +1426,12 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
       <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px"><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-muted)"><input type="checkbox" id="notifyExpenses" style="width:16px;height:16px;accent-color:var(--accent)" onchange="saveNotifySettings()" />Notify on expense entries</label><label style="display:flex;align-items:center;gap:10px;cursor:pointer;font-size:13px;color:var(--text-muted)"><input type="checkbox" id="notifyRent" style="width:16px;height:16px;accent-color:var(--accent)" onchange="saveNotifySettings()" />Notify on rent entries</label></div>
     </div>
     <div class="sett-divider"></div>
-    <div class="sett-section"><div class="sett-section-header"><div class="sett-section-icon">↺</div><div><div class="sett-section-title">Reset to Defaults</div></div></div><button class="btn-danger" onclick="confirmReset()">Reset Cards &amp; Properties to Defaults</button></div>
+    <div class="sett-section"><div class="sett-section-header"><div class="sett-section-icon">↺</div><div><div class="sett-section-title">Reset to Defaults</div></div></div><button class="btn-danger" onclick="confirmReset()">Reset Card Numbers to Defaults</button></div>
   </div>
   <div class="settings-footer"><button class="btn-primary" onclick="closeSettings()" style="margin-top:0">Done</button></div>
 </div>
 <!-- Chart.js loaded async — only needed for overview/charts screens -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
-
 <!-- ⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️ -->
 <!-- MODULE 3A: CORE LOGIC & COMMAND CENTER           -->
 <!-- ⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️ -->
@@ -1318,7 +1441,6 @@ window.onerror = function(msg, src, line, col, err) {
   document.body.innerHTML = '<h2 style="color:#c8a96e">App Error</h2><p>' + msg + '</p><p>Line: ' + line + '</p><p>' + (err ? err.stack : '') + '</p>'; return true;
 };
 
-// DEFAULTS now strictly handled by Property Master tab API payload
 const BUSINESS_NAMES = { LNI: 'LN Investments', LNEP: 'LNE Properties' };
 
 const BUILTIN_STORE_HELPERS = [
@@ -1444,6 +1566,8 @@ let currentScreen = '';
 function goToScreen(name) {
   if (name === 'property' && STATE.isBusinessExpense) name = 'vendor';
   if (name === 'hub') setTimeout(() => refreshCommandCenter(false), 30);
+  if (name === 'add-property') setTimeout(initAddPropertyScreen, 30);
+  if (name === 'metrics') setTimeout(() => refreshCommandCenter(false), 30);
   if (name === 'workorders') setTimeout(initWorkOrdersScreen, 30);
   if (name === 'leases') setTimeout(initLeasesScreen, 30);
   if (name === 'specs') setTimeout(initSpecsScreen, 30);
@@ -1481,6 +1605,153 @@ function updateProgress(name) {
 function goBackFromVendor() { goToScreen(STATE.isBusinessExpense ? 'business' : 'property'); }
 function editProperty() { goToScreen(STATE.isBusinessExpense ? 'business' : 'property'); }
 function closeModal(modalId) { const el = document.getElementById(modalId); if (el) el.classList.remove('open'); }
+
+// ════════════════════════════════════════════
+// ADD PROPERTY SCREEN & MASTER PORTFOLIO
+// ════════════════════════════════════════════
+async function initAddPropertyScreen() {
+  const loading = document.getElementById('masterPropListLoading');
+  const errEl = document.getElementById('addPropError');
+  const okEl = document.getElementById('addPropSuccess');
+  if (errEl) errEl.style.display = 'none';
+  if (okEl) okEl.style.display = 'none';
+
+  if (!MASTER_PROPERTIES.length) {
+    if (loading) loading.style.display = 'flex';
+    await syncPropertiesFromSheet();
+    if (loading) loading.style.display = 'none';
+  }
+  renderMasterPropertiesList();
+}
+
+function renderMasterPropertiesList() {
+  const container = document.getElementById('masterPropList');
+  const countEl = document.getElementById('masterPropListCount');
+  if (!container) return;
+
+  const activeProps = MASTER_PROPERTIES.filter(p => (p.status || 'Active') === 'Active');
+  if (countEl) countEl.textContent = activeProps.length;
+
+  if (!MASTER_PROPERTIES.length) {
+    container.innerHTML = '<div style="text-align:center;padding:24px 16px;color:var(--text-muted);font-size:13px;background:var(--surface);border:1.5px solid var(--border);border-radius:var(--radius);">No properties found in Property Master yet. Add your first door above.</div>';
+    return;
+  }
+
+  container.innerHTML = '';
+  MASTER_PROPERTIES.forEach(p => {
+    const isSold = String(p.status || 'Active').toLowerCase() === 'sold';
+    const badgeClass = isSold ? 'pill-muted' : 'pill-success';
+    const badgeLabel = isSold ? 'Sold' : 'Active';
+    const nextStatus = isSold ? 'Active' : 'Sold';
+    const actionLabel = isSold ? 'Reactivate' : 'Mark Sold';
+
+    const card = document.createElement('div');
+    card.className = 'ops-card';
+    card.style.cursor = 'default';
+    card.innerHTML = `
+      <div class="ops-card-top">
+        <div>
+          <div style="font-size:10px;font-weight:700;letter-spacing:0.08em;color:var(--accent);text-transform:uppercase;margin-bottom:2px;">${escapeHtml(p.business || 'LNI')} · ${escapeHtml(p.abbr || '—')} · ${escapeHtml(p.type || 'Long-Term')}</div>
+          <div class="ops-card-title">${escapeHtml(p.name)}</div>
+        </div>
+        <span class="status-pill ${badgeClass}">${badgeLabel}</span>
+      </div>
+      <div class="ops-card-sub">${escapeHtml(p.address)}</div>
+      <div class="ops-card-meta" style="justify-content:space-between;">
+        <span>💵 Baseline: ${escapeHtml(p.rent || '—')}/mo</span>
+        <button onclick="togglePropertyStatus('${escapeHtml(p.address).replace(/'/g, "\\'")}', '${nextStatus}')" style="background:transparent;border:1px solid var(--border);color:var(--text-muted);border-radius:6px;padding:3px 9px;font-size:11px;font-weight:600;cursor:pointer;">${actionLabel}</button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+async function submitNewProperty() {
+  const name = document.getElementById('newPropName').value.trim();
+  const abbr = document.getElementById('newPropAbbr').value.trim().toUpperCase();
+  const address = document.getElementById('newPropAddress').value.trim();
+  const business = document.getElementById('newPropBiz').value;
+  const rentalType = document.getElementById('newPropType').value;
+  const rent = document.getElementById('newPropRent').value.trim();
+  const notes = document.getElementById('newPropNotes').value.trim();
+
+  const errEl = document.getElementById('addPropError');
+  const okEl = document.getElementById('addPropSuccess');
+  const btn = document.getElementById('saveNewPropBtn');
+
+  errEl.style.display = 'none';
+  okEl.style.display = 'none';
+
+  if (!name || !address) {
+    errEl.textContent = 'Short Display Name and Full Physical Address are required.';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = 'Saving to Property Master…';
+
+  try {
+    const res = await postPmCommandCenter({
+      action: 'save_property',
+      property: {
+        name: name,
+        address: address,
+        business: business,
+        abbr: abbr || name.substring(0, 3).toUpperCase(),
+        status: 'Active',
+        type: rentalType,
+        rent: rent,
+        notes: notes
+      }
+    });
+
+    if (Array.isArray(res.properties)) {
+      MASTER_PROPERTIES = res.properties;
+    } else {
+      await syncPropertiesFromSheet();
+    }
+
+    document.getElementById('newPropName').value = '';
+    document.getElementById('newPropAbbr').value = '';
+    document.getElementById('newPropAddress').value = '';
+    document.getElementById('newPropRent').value = '';
+    document.getElementById('newPropNotes').value = '';
+
+    okEl.style.display = 'flex';
+    setTimeout(() => { okEl.style.display = 'none'; }, 3000);
+    renderMasterPropertiesList();
+  } catch (err) {
+    errEl.textContent = 'Failed to save property: ' + err.message;
+    errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '+ Save Property to Master';
+  }
+}
+
+async function togglePropertyStatus(address, newStatus) {
+  const errEl = document.getElementById('addPropError');
+  if (errEl) errEl.style.display = 'none';
+  try {
+    const res = await postPmCommandCenter({
+      action: 'update_property_status',
+      address: address,
+      status: newStatus
+    });
+    if (Array.isArray(res.properties)) {
+      MASTER_PROPERTIES = res.properties;
+    } else {
+      await syncPropertiesFromSheet();
+    }
+    renderMasterPropertiesList();
+  } catch (err) {
+    if (errEl) {
+      errEl.textContent = 'Status update failed: ' + err.message;
+      errEl.style.display = 'block';
+    }
+  }
+}
 
 // ════════════════════════════════════════════
 // COMMAND CENTER DATA ENGINE (AI PM BACKEND)
@@ -1521,18 +1792,36 @@ async function refreshCommandCenter(force) {
     const activeWos = PM_STATE.workOrders.filter(w => w.bucket === 'active').length;
     const pendingWos = PM_STATE.workOrders.filter(w => w.bucket === 'pending').length;
     const totalOpenWos = activeWos + pendingWos;
-    document.getElementById('hubWoCount').textContent = totalOpenWos;
-    document.getElementById('hubWoCount').style.color = totalOpenWos > 0 ? 'var(--warning)' : 'var(--success)';
-    document.getElementById('hubWoSub').textContent = `${activeWos} active · ${pendingWos} pending`;
+    const woCountEl = document.getElementById('hubWoCount');
+    if (woCountEl) {
+      woCountEl.textContent = totalOpenWos;
+      woCountEl.style.color = totalOpenWos > 0 ? 'var(--warning)' : 'var(--success)';
+    }
+    const woSubEl = document.getElementById('hubWoSub');
+    if (woSubEl) woSubEl.textContent = `${activeWos} active · ${pendingWos} pending`;
 
     const actionLeases = PM_STATE.leases.filter(l => l.category === 'pending_sig' || l.category === 'expired' || l.category === 'expiring_soon').length;
-    document.getElementById('hubLeaseCount').textContent = actionLeases;
-    document.getElementById('hubLeaseCount').style.color = actionLeases > 0 ? 'var(--accent)' : 'var(--success)';
-    document.getElementById('hubLeaseSub').textContent = `${PM_STATE.leases.length} total leases tracked`;
+    const leaseCountEl = document.getElementById('hubLeaseCount');
+    if (leaseCountEl) {
+      leaseCountEl.textContent = actionLeases;
+      leaseCountEl.style.color = actionLeases > 0 ? 'var(--accent)' : 'var(--success)';
+    }
+    const leaseSubEl = document.getElementById('hubLeaseSub');
+    if (leaseSubEl) leaseSubEl.textContent = `${PM_STATE.leases.length} total leases tracked`;
 
-    if (statusLine) { const nowTime = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); statusLine.textContent = `Synced at ${nowTime} · Tap any module below`; }
+    const metricsSubEl = document.getElementById('hubMetricsSub');
+    if (metricsSubEl) metricsSubEl.textContent = `${totalOpenWos} open tickets · ${actionLeases} lease actions`;
+
+    const activePropCount = MASTER_PROPERTIES.filter(p => (p.status || 'Active') === 'Active').length;
+    const propSubEl = document.getElementById('hubPropCountSub');
+    if (propSubEl && activePropCount > 0) propSubEl.textContent = `${activePropCount} active doors in Property Master`;
+
+    if (statusLine) { const nowTime = new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }); statusLine.textContent = `Synced at ${nowTime} · Tap any workspace below`; }
   } catch (err) {
-    document.getElementById('hubWoCount').textContent = '!'; document.getElementById('hubWoSub').textContent = 'Check PM URL in ⚙';
+    const woCountEl = document.getElementById('hubWoCount');
+    if (woCountEl) woCountEl.textContent = '!';
+    const woSubEl = document.getElementById('hubWoSub');
+    if (woSubEl) woSubEl.textContent = 'Check PM URL in ⚙';
     if (statusLine) statusLine.textContent = 'PM Sync note: ' + err.message;
   }
   if (CFG.webAppUrl) {
@@ -1542,8 +1831,11 @@ async function refreshCommandCenter(force) {
       const lniData = await lniResp.json(); const lnepData = await lnepResp.json();
       const parseNum = (v) => { if (v === null || v === undefined || v === '' || v === 'ERROR') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(/[$,\s]/g, '')); return isNaN(n) ? null : n; };
       const v1 = parseNum(lniData.bizTotal); const v2 = parseNum(lnepData.bizTotal);
-      const netEl = document.getElementById('hubNetPnl');
-      if (v1 !== null && v2 !== null) { const sum = v1 + v2; netEl.textContent = formatNet(sum); netEl.style.color = sum >= 0 ? 'var(--success)' : 'var(--danger)'; document.getElementById('hubNetSub').textContent = `${yr} YTD across LNI & LNEP`; }
+      const netSubEl = document.getElementById('hubNetSub');
+      if (v1 !== null && v2 !== null && netSubEl) {
+        const sum = v1 + v2;
+        netSubEl.textContent = `${yr} YTD Net: ${formatNet(sum)}`;
+      }
     } catch (finErr) {}
   }
 }
@@ -1762,7 +2054,8 @@ async function openNewTenantModal() {
   if (!MASTER_PROPERTIES.length) {
     await syncPropertiesFromSheet();
   }
-  const uniqueProps = [...new Set([...MASTER_PROPERTIES.map(p => p.address), ...PM_STATE.leases.map(l => l.address)])].filter(Boolean).sort();
+  const activeProps = MASTER_PROPERTIES.filter(p => (p.status || 'Active') === 'Active');
+  const uniqueProps = [...new Set([...activeProps.map(p => p.address), ...PM_STATE.leases.map(l => l.address)])].filter(Boolean).sort();
   uniqueProps.forEach(addr => {
     const opt = document.createElement('option');
     opt.value = addr; opt.textContent = addr;
@@ -1873,7 +2166,6 @@ function renderSpecsList() {
 }
 function escapeHtml(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 </script>
-  
 <!-- ⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️ -->
 <!-- MODULE 3B: EXPENSE ENGINE, TRACKING & INIT       -->
 <!-- ⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️ -->
@@ -1974,7 +2266,7 @@ async function buildPropertyList() {
   if (!MASTER_PROPERTIES.length) {
     await syncPropertiesFromSheet();
   }
-  const props = MASTER_PROPERTIES.filter(p => p.business === STATE.business).map(p => p.name);
+  const props = MASTER_PROPERTIES.filter(p => p.business === STATE.business && (p.status || 'Active') === 'Active').map(p => p.name);
   if (!props.length) { list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:16px 0">No active properties synced from Property Master.</div>'; return; }
   props.forEach(p => {
     const card = document.createElement('div'); card.className = 'checkbox-card' + (STATE.property === p ? ' selected' : '');
@@ -2182,7 +2474,8 @@ async function buildRentPropertyPicker() {
   if (!MASTER_PROPERTIES.length) {
     await syncPropertiesFromSheet();
   }
-  MASTER_PROPERTIES.forEach(p => {
+  const activeProps = MASTER_PROPERTIES.filter(p => (p.status || 'Active') === 'Active');
+  activeProps.forEach(p => {
     const card = document.createElement('div'); card.className = 'checkbox-card' + (RENT_STATE.selectedProperty === p.name ? ' selected' : '');
     card.innerHTML = `<div class="cb-box"><svg class="cb-check" width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div style="flex:1"><div class="cb-label">${p.name}</div><div class="cb-sub">${p.business === 'LNI' ? 'LN Investments' : 'LNE Properties'}</div></div>`;
     card.onclick = () => { RENT_STATE.selectedProperty = p.name; RENT_STATE.selectedBusiness = p.business; document.querySelectorAll('#rentPropertyList .checkbox-card').forEach(c => c.classList.remove('selected')); card.classList.add('selected'); const t = RENT_STATE.tenants[RENT_STATE.selectedTenant]; showRentFields(t); };
@@ -2265,7 +2558,7 @@ async function loadRepsPlaces() {
   container.innerHTML = '';
   
   const items = ['LN Investments', 'LNE Properties', 'Portfolio'];
-  MASTER_PROPERTIES.forEach(p => {
+  MASTER_PROPERTIES.filter(p => (p.status || 'Active') === 'Active').forEach(p => {
     if (!items.includes(p.name)) items.push(p.name);
   });
 
@@ -2350,21 +2643,22 @@ function rebuildPropertyListWithTotals() { const loading = document.getElementBy
 
 async function syncPropertiesFromSheet() {
   try {
-    if (CFG.webAppUrl) {
-      const resp = await fetch(CFG.webAppUrl + '?action=get_properties&_t=' + Date.now());
+    if (CFG.pmWebAppUrl) {
+      const params = new URLSearchParams({ action: 'get_properties', includeAll: 'true', _t: Date.now() });
+      if (CFG.pmSecret && CFG.pmSecret !== 'REPLACE_WITH_A_LONG_RANDOM_STRING') params.set('secret', CFG.pmSecret);
+      const resp = await fetch(CFG.pmWebAppUrl + '?' + params.toString());
       const data = await resp.json();
       if (data.success && Array.isArray(data.properties) && data.properties.length > 0) {
         MASTER_PROPERTIES = data.properties;
         return;
       }
     }
-    if (CFG.pmWebAppUrl) {
-      const params = new URLSearchParams({ action: 'get_properties', _t: Date.now() });
-      if (CFG.pmSecret && CFG.pmSecret !== 'REPLACE_WITH_A_LONG_RANDOM_STRING') params.set('secret', CFG.pmSecret);
-      const resp = await fetch(CFG.pmWebAppUrl + '?' + params.toString());
+    if (CFG.webAppUrl) {
+      const resp = await fetch(CFG.webAppUrl + '?action=get_properties&_t=' + Date.now());
       const data = await resp.json();
-      if (data.success && Array.isArray(data.properties)) {
+      if (data.success && Array.isArray(data.properties) && data.properties.length > 0) {
         MASTER_PROPERTIES = data.properties;
+        return;
       }
     }
   } catch (e) {
