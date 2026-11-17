@@ -1000,18 +1000,9 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
       </div>
     </div>
     <div class="field-wrap" style="margin-top:16px">
-      <label class="field-label">Place</label>
-      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px" id="repsPlaceBtns">
-        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Beau Darren',this)">Beau Darren</button>
-        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Briarhurst',this)">Briarhurst</button>
-        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Cornerstone',this)">Cornerstone</button>
-        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Letitia',this)">Letitia</button>
-        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('LN Investments',this)">LN Investments</button>
-        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('LNE Properties',this)">LNE Properties</button>
-        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Portfolio',this)">Portfolio</button>
-        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Parkridge',this)">Parkridge</button>
-        <button class="cat-card" style="font-size:12px;padding:8px 12px;border-radius:20px;flex:none" onclick="selectRepsPlace('Rue',this)">Rue</button>
-      </div>
+      <label class="field-label">Place <span id="repsPlaceYearTag" style="color:var(--text-dim);font-weight:400"></span></label>
+      <div id="repsPlaceLoading" class="loading-cats" style="display:none;padding:6px 0 10px;font-size:12px;"><div class="mini-spinner"></div> Syncing properties from sheet…</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:10px" id="repsPlaceBtns"></div>
       <div class="field-input-wrap">
         <input type="text" id="repsPlaceInput" placeholder="Or type a custom place…" oninput="onRepsPlaceTyped()" />
         <button class="field-clear" onclick="clearRepsPlace()">×</button>
@@ -1020,7 +1011,7 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     <div class="field-wrap">
       <label class="field-label">Time Spent (hours)</label>
       <div class="field-input-wrap">
-        <input type="text" id="repsTimeInput" placeholder="e.g. 1.5" inputmode="decimal" autocomplete="off" oninput="checkRepsNext()" />
+        <input type="tel" id="repsTimeInput" placeholder="e.g. 1.5" inputmode="decimal" autocomplete="off" oninput="checkRepsNext()" />
         <button class="field-clear" onclick="clearField('repsTimeInput'); checkRepsNext()">×</button>
       </div>
       <div class="field-hint">Enter decimal hours (e.g. 0.5 = 30 min, 1.5 = 1h 30min)</div>
@@ -2169,20 +2160,122 @@ async function submitRent() {
 }
 
 // ════════════════════════════════════════════
-// REPS ENTRY (FULLY RESTORED)
+// REPS ENTRY (DYNAMIC YEAR-MATCHED PROPERTIES)
 // ════════════════════════════════════════════
-const REPS_STATE = { date: null, calYear: new Date().getFullYear(), calMonth: new Date().getMonth() };
+const REPS_STATE = { date: null, calYear: new Date().getFullYear(), calMonth: new Date().getMonth(), loadedYear: null, placesCache: {} };
+
+function simplifyRepsPlaceLabel(name) {
+  const clean = String(name || '').trim();
+  const overrides = { 'Rue De Belle Maison': 'Rue' };
+  if (overrides[clean]) return overrides[clean];
+  const words = clean.split(/\s+/);
+  return words.length >= 4 ? words[0] : clean;
+}
 
 function initRepsScreen() {
   const errEl = document.getElementById('repsError'); if (errEl) errEl.style.display = 'none';
-  document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected'));
-  if (!REPS_STATE.date) { const today = new Date(); REPS_STATE.date = today; REPS_STATE.calYear = today.getFullYear(); REPS_STATE.calMonth = today.getMonth(); document.getElementById('repsDateInput').value = (today.getMonth()+1) + '/' + today.getDate() + '/' + today.getFullYear(); }
-  renderRepsCalendar(); checkRepsNext();
+  if (!REPS_STATE.date) {
+    const today = new Date();
+    REPS_STATE.date = today;
+    REPS_STATE.calYear = today.getFullYear();
+    REPS_STATE.calMonth = today.getMonth();
+    document.getElementById('repsDateInput').value = (today.getMonth()+1) + '/' + today.getDate() + '/' + today.getFullYear();
+  }
+  renderRepsCalendar();
+  const targetYear = REPS_STATE.date ? REPS_STATE.date.getFullYear() : new Date().getFullYear();
+  loadRepsPlacesForYear(targetYear);
+  checkRepsNext();
 }
+
+async function loadRepsPlacesForYear(year) {
+  const loadingEl = document.getElementById('repsPlaceLoading');
+  const yearTag = document.getElementById('repsPlaceYearTag');
+  if (yearTag) yearTag.textContent = `(${year} Sheet)`;
+
+  if (REPS_STATE.placesCache[year]) {
+    REPS_STATE.loadedYear = year;
+    renderRepsPlaceButtons(REPS_STATE.placesCache[year]);
+    return;
+  }
+
+  if (loadingEl) loadingEl.style.display = 'flex';
+  const collected = [];
+
+  if (CFG.webAppUrl) {
+    try {
+      const [lniResp, lnepResp] = await Promise.all([
+        fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year + '&business=LNI&_t=' + Date.now()),
+        fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year + '&business=LNEP&_t=' + Date.now())
+      ]);
+      const lniData = await lniResp.json();
+      const lnepData = await lnepResp.json();
+      if (!lniData.error && lniData.totals) {
+        Object.keys(lniData.totals).filter(k => !k.startsWith('_')).forEach(p => collected.push(p));
+      }
+      if (!lnepData.error && lnepData.totals) {
+        Object.keys(lnepData.totals).filter(k => !k.startsWith('_')).forEach(p => collected.push(p));
+      }
+    } catch (e) {
+      console.warn('Could not fetch REPS properties for year ' + year, e);
+    }
+  }
+
+  // Fallback to locally synced property list if offline or sheet tab not found
+  if (!collected.length) {
+    [...(CFG.LNI?.props || []), ...(CFG.LNEP?.props || [])].forEach(p => collected.push(p));
+  }
+
+  // Deduplicate properties & combine with business/portfolio options
+  const uniqueProps = [...new Set(collected.map(p => String(p).trim()).filter(Boolean))];
+  const entityOptions = ['LN Investments', 'LNE Properties', 'Portfolio'];
+  const combined = [...uniqueProps];
+  entityOptions.forEach(ent => {
+    if (!combined.some(x => x.toLowerCase() === ent.toLowerCase())) combined.push(ent);
+  });
+
+  const placeItems = combined.map(fullName => ({
+    label: simplifyRepsPlaceLabel(fullName),
+    value: simplifyRepsPlaceLabel(fullName)
+  }));
+
+  REPS_STATE.placesCache[year] = placeItems;
+  REPS_STATE.loadedYear = year;
+  if (loadingEl) loadingEl.style.display = 'none';
+  renderRepsPlaceButtons(placeItems);
+}
+
+function renderRepsPlaceButtons(items) {
+  const container = document.getElementById('repsPlaceBtns');
+  if (!container) return;
+  const currentVal = (document.getElementById('repsPlaceInput').value || '').trim().toLowerCase();
+  container.innerHTML = '';
+
+  items.forEach(item => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'cat-card' + (currentVal && currentVal === item.value.toLowerCase() ? ' selected' : '');
+    btn.style.cssText = 'font-size:12px;padding:8px 12px;border-radius:20px;flex:none';
+    btn.textContent = item.label;
+    btn.onclick = () => selectRepsPlace(item.value, btn);
+    container.appendChild(btn);
+  });
+}
+
 function handleRepsDateInput(val) { const digits = val.replace(/\D/g, ''); let fmt = digits; if (digits.length > 2) fmt = digits.substring(0,2) + '/' + digits.substring(2); if (digits.length > 4) fmt = digits.substring(0,2) + '/' + digits.substring(2,4) + '/' + digits.substring(4,8); const input = document.getElementById('repsDateInput'); if (fmt !== val) input.value = fmt; parseRepsDateInput(fmt); }
 function parseRepsDateInput(val) {
   const parts = val.split('/');
-  if (parts.length === 3) { const mo = parseInt(parts[0]), dy = parseInt(parts[1]); let yr = parseInt(parts[2]); if (yr < 100) yr += 2000; if (mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31 && yr >= 2020 && yr <= 2035) { const d = new Date(yr, mo-1, dy); if (!isNaN(d)) { REPS_STATE.date = d; REPS_STATE.calYear = yr; REPS_STATE.calMonth = mo - 1; renderRepsCalendar(); checkRepsNext(); } } }
+  if (parts.length === 3) {
+    const mo = parseInt(parts[0]), dy = parseInt(parts[1]); let yr = parseInt(parts[2]); if (yr < 100) yr += 2000;
+    if (mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31 && yr >= 2020 && yr <= 2035) {
+      const d = new Date(yr, mo-1, dy);
+      if (!isNaN(d)) {
+        REPS_STATE.date = d; REPS_STATE.calYear = yr; REPS_STATE.calMonth = mo - 1;
+        renderRepsCalendar();
+        if (REPS_STATE.loadedYear !== yr) loadRepsPlacesForYear(yr);
+        checkRepsNext();
+      }
+    }
+  }
 }
 function repsCalNav(dir) { REPS_STATE.calMonth += dir; if (REPS_STATE.calMonth > 11) { REPS_STATE.calMonth = 0; REPS_STATE.calYear++; } if (REPS_STATE.calMonth < 0)  { REPS_STATE.calMonth = 11; REPS_STATE.calYear--; } renderRepsCalendar(); }
 function renderRepsCalendar() {
@@ -2193,7 +2286,14 @@ function renderRepsCalendar() {
   for (let d = 1; d <= daysInMonth; d++) {
     const el = document.createElement('div'); el.className = 'cal-cell'; el.textContent = d; const cellDate = new Date(REPS_STATE.calYear, REPS_STATE.calMonth, d);
     if (today.toDateString() === cellDate.toDateString()) el.classList.add('today'); if (REPS_STATE.date && REPS_STATE.date.toDateString() === cellDate.toDateString()) el.classList.add('selected');
-    el.onclick = () => { REPS_STATE.date = new Date(REPS_STATE.calYear, REPS_STATE.calMonth, d); document.getElementById('repsDateInput').value = (REPS_STATE.calMonth+1) + '/' + d + '/' + REPS_STATE.calYear; renderRepsCalendar(); checkRepsNext(); };
+    el.onclick = () => {
+      const pickedYear = REPS_STATE.calYear;
+      REPS_STATE.date = new Date(pickedYear, REPS_STATE.calMonth, d);
+      document.getElementById('repsDateInput').value = (REPS_STATE.calMonth+1) + '/' + d + '/' + pickedYear;
+      renderRepsCalendar();
+      if (REPS_STATE.loadedYear !== pickedYear) loadRepsPlacesForYear(pickedYear);
+      checkRepsNext();
+    };
     cells.appendChild(el);
   }
 }
