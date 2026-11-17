@@ -1256,6 +1256,18 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     <button class="settings-close" onclick="closeSettings()">×</button>
   </div>
   <div class="settings-body">
+    <!-- ── Preferred Vendors (Shared · Priority Order) ── -->
+    <div class="sett-section">
+      <div class="sett-section-header"><div class="sett-section-icon">🔧</div><div><div class="sett-section-title">Preferred Vendors (Shared)</div><div class="sett-section-sub">Priority #1 = Primary · Synced to Google Sheets</div></div></div>
+      <div id="settVendorsSuccess" class="success-msg" style="display:none">✓ Synced to Google Sheets</div>
+      <div id="sharedVendorsError" class="error-msg" style="display:none"></div>
+      <div id="sharedVendorsLoading" class="loading-cats" style="display:none;padding:6px 0;font-size:12px;"><div class="mini-spinner"></div> Syncing vendor list…</div>
+      <div id="sharedVendorsList" style="margin-bottom:10px"></div>
+      <div class="add-row" style="gap:6px;margin-bottom:6px"><input class="add-input" type="text" id="newVendorCat" placeholder="Trade (e.g. Pest Control)" style="flex:1" /><input class="add-input" type="text" id="newVendorName" placeholder="Vendor Name" style="flex:1" /></div>
+      <div class="add-row" style="gap:6px;margin-bottom:6px"><input class="add-input" type="email" id="newVendorEmail" placeholder="Email (optional)" style="flex:1" /><input class="add-input" type="tel" id="newVendorPhone" placeholder="Phone (optional)" style="flex:1" /></div>
+      <div class="add-row" style="gap:6px"><input class="add-input" type="text" id="newVendorNotes" placeholder="Notes (optional)" style="flex:2" onkeydown="if(event.key==='Enter') addSharedVendor()" /><button class="add-btn" onclick="addSharedVendor()">Add</button></div>
+    </div>
+    <div class="sett-divider"></div>
     <!-- ── AI Property Manager Backend URL ── -->
     <div class="sett-section">
       <div class="sett-section-header"><div class="sett-section-icon">🏢</div><div><div class="sett-section-title">AI Property Manager URL</div><div class="sett-section-sub">Leases, Work Orders &amp; SMS Dispatch backend</div></div></div>
@@ -1351,7 +1363,7 @@ let CFG = getConfig();
 function persistCFG() { saveConfigToStorage(CFG); }
 
 const STATE = { fileBase64: null, fileMimeType: null, scanned: {}, business: null, isBusinessExpense: false, property: null, vendor: '', date: null, purpose: null, amount: null, description: '', calYear: new Date().getFullYear(), calMonth: new Date().getMonth() };
-const PM_STATE = { loaded: false, leases: [], workOrders: [], specs: [], woFilter: 'active', leaseFilter: 'action', selectedWo: null, selectedLease: null };
+const PM_STATE = { loaded: false, leases: [], workOrders: [], vendors: [], specs: [], woFilter: 'active', leaseFilter: 'action', selectedWo: null, selectedLease: null };
 
 function openSettings() {
   renderTagList('LNI', 'cards'); renderTagList('LNEP', 'cards'); renderTagList('LNI', 'props'); renderTagList('LNEP', 'props'); renderPropAbbrList(); renderStoreHelperList(); loadNotifySettings();
@@ -1360,9 +1372,144 @@ function openSettings() {
   const pmSecEl = document.getElementById('settPmSecret'); if (pmSecEl) pmSecEl.value = CFG.pmSecret || '';
   const visionEl = document.getElementById('settVisionKey'); if (visionEl) visionEl.value = CFG.visionApiKey || '';
   document.getElementById('settingsOverlay').classList.add('open'); document.getElementById('settingsDrawer').classList.add('open');
+  loadSharedVendorsInSettings();
 }
 function closeSettings() { document.getElementById('settingsOverlay').classList.remove('open'); document.getElementById('settingsDrawer').classList.remove('open'); updateBusinessSubtitles(); }
-function savePmSettings() { const pmUrl = document.getElementById('settPmWebAppUrl').value.trim(); const pmSec = document.getElementById('settPmSecret').value.trim(); if (pmUrl) CFG.pmWebAppUrl = pmUrl; CFG.pmSecret = pmSec; persistCFG(); PM_STATE.loaded = false; const msg = document.getElementById('settPmUrlSuccess'); msg.style.display = 'flex'; setTimeout(() => msg.style.display = 'none', 2500); }
+function savePmSettings() { const pmUrl = document.getElementById('settPmWebAppUrl').value.trim(); const pmSec = document.getElementById('settPmSecret').value.trim(); if (pmUrl) CFG.pmWebAppUrl = pmUrl; CFG.pmSecret = pmSec; persistCFG(); PM_STATE.loaded = false; const msg = document.getElementById('settPmUrlSuccess'); msg.style.display = 'flex'; setTimeout(() => msg.style.display = 'none', 2500); loadSharedVendorsInSettings(); }
+
+// ════════════════════════════════════════════
+// SHARED PREFERRED VENDORS MANAGER (GOOGLE SHEETS)
+// ════════════════════════════════════════════
+async function loadSharedVendorsInSettings() {
+  const loading = document.getElementById('sharedVendorsLoading');
+  const errEl = document.getElementById('sharedVendorsError');
+  if (errEl) errEl.style.display = 'none';
+  if (!CFG.pmWebAppUrl) {
+    renderSharedVendorsList();
+    return;
+  }
+  if (loading) loading.style.display = 'flex';
+  try {
+    const params = new URLSearchParams({ action: 'get_vendors', _t: Date.now() });
+    if (CFG.pmSecret && CFG.pmSecret !== 'REPLACE_WITH_A_LONG_RANDOM_STRING') params.set('secret', CFG.pmSecret);
+    const resp = await fetch(CFG.pmWebAppUrl + '?' + params.toString());
+    const data = await resp.json();
+    if (!data.success) throw new Error(data.error || 'Failed to fetch vendors');
+    PM_STATE.vendors = Array.isArray(data.vendors) ? data.vendors : [];
+  } catch (err) {
+    if (errEl) { errEl.textContent = 'Sync error: ' + err.message; errEl.style.display = 'block'; }
+  } finally {
+    if (loading) loading.style.display = 'none';
+    renderSharedVendorsList();
+  }
+}
+
+function renderSharedVendorsList() {
+  const container = document.getElementById('sharedVendorsList');
+  if (!container) return;
+  container.innerHTML = '';
+
+  if (!PM_STATE.vendors || PM_STATE.vendors.length === 0) {
+    container.innerHTML = '<div class="tag-empty">No preferred vendors saved yet. Add your primary vendor below.</div>';
+    return;
+  }
+
+  PM_STATE.vendors.forEach((v, idx) => {
+    const card = document.createElement('div');
+    card.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);';
+    const contactStr = [v.email, v.phone].filter(Boolean).join(' · ') || 'No contact info';
+    card.innerHTML = `
+      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
+        <div style="width:24px;height:24px;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">#${idx + 1}</div>
+        <div style="min-width:0;flex:1;">
+          <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(v.name)} <span style="font-size:11px;font-weight:500;color:var(--accent);">(${escapeHtml(v.category)})</span></div>
+          <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(contactStr)}</div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
+        <button onclick="moveSharedVendor(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="Move Up (Higher Priority)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;width:26px;height:26px;cursor:pointer;opacity:${idx === 0 ? '0.35' : '1'};">↑</button>
+        <button onclick="moveSharedVendor(${idx}, 1)" ${idx === PM_STATE.vendors.length - 1 ? 'disabled' : ''} title="Move Down (Lower Priority)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;width:26px;height:26px;cursor:pointer;opacity:${idx === PM_STATE.vendors.length - 1 ? '0.35' : '1'};">↓</button>
+        <button onclick="removeSharedVendor(${idx})" title="Remove Vendor" class="tag-remove" style="margin-left:2px;">×</button>
+      </div>
+    `;
+    container.appendChild(card);
+  });
+}
+
+async function addSharedVendor() {
+  const catEl = document.getElementById('newVendorCat');
+  const nameEl = document.getElementById('newVendorName');
+  const emailEl = document.getElementById('newVendorEmail');
+  const phoneEl = document.getElementById('newVendorPhone');
+  const notesEl = document.getElementById('newVendorNotes');
+  const errEl = document.getElementById('sharedVendorsError');
+
+  const category = catEl.value.trim() || 'General';
+  const name = nameEl.value.trim();
+  const email = emailEl.value.trim();
+  const phone = phoneEl.value.trim();
+  const notes = notesEl.value.trim();
+
+  if (!name) {
+    if (errEl) { errEl.textContent = 'Vendor Name is required.'; errEl.style.display = 'block'; }
+    return;
+  }
+  if (errEl) errEl.style.display = 'none';
+
+  const updated = [...PM_STATE.vendors, { category, name, email, phone, notes }];
+  await persistSharedVendors(updated);
+
+  catEl.value = '';
+  nameEl.value = '';
+  emailEl.value = '';
+  phoneEl.value = '';
+  notesEl.value = '';
+}
+
+async function moveSharedVendor(index, delta) {
+  const targetIdx = index + delta;
+  if (targetIdx < 0 || targetIdx >= PM_STATE.vendors.length) return;
+  const updated = [...PM_STATE.vendors];
+  const temp = updated[index];
+  updated[index] = updated[targetIdx];
+  updated[targetIdx] = temp;
+  await persistSharedVendors(updated);
+}
+
+async function removeSharedVendor(index) {
+  const updated = PM_STATE.vendors.filter((_, i) => i !== index);
+  await persistSharedVendors(updated);
+}
+
+async function persistSharedVendors(vendorsList) {
+  const errEl = document.getElementById('sharedVendorsError');
+  const okEl = document.getElementById('settVendorsSuccess');
+  if (errEl) errEl.style.display = 'none';
+
+  PM_STATE.vendors = vendorsList;
+  renderSharedVendorsList();
+
+  try {
+    const res = await postPmCommandCenter({
+      action: 'save_vendors',
+      vendors: vendorsList
+    });
+    if (Array.isArray(res.vendors)) {
+      PM_STATE.vendors = res.vendors;
+      renderSharedVendorsList();
+    }
+    if (okEl) {
+      okEl.style.display = 'flex';
+      setTimeout(() => okEl.style.display = 'none', 2200);
+    }
+  } catch (err) {
+    if (errEl) {
+      errEl.textContent = 'Failed to save to Google Sheets: ' + err.message;
+      errEl.style.display = 'block';
+    }
+  }
+}
+
 function renderTagList(biz, type) { const container = document.getElementById(`tags-${biz}-${type === 'cards' ? 'cards' : 'props'}`); if (!container) return; const items = CFG[biz][type === 'cards' ? 'cards' : 'props']; container.innerHTML = ''; if (!items.length) { container.innerHTML = `<span class="tag-empty">No ${type === 'cards' ? 'card numbers' : 'properties'} added yet</span>`; return; } items.forEach((item, i) => { const tag = document.createElement('div'); tag.className = 'tag-item'; tag.innerHTML = `<span>${item}</span><button class="tag-remove" onclick="removeTag('${biz}','${type === 'cards' ? 'cards' : 'props'}',${i})" title="Remove">×</button>`; container.appendChild(tag); }); }
 function addTag(biz, type) { const key = type === 'cards' ? 'cards' : 'props'; const input = document.getElementById(`add-${biz}-${type === 'cards' ? 'cards' : 'props'}`); const val = input.value.trim(); if (!val) return; if (type === 'cards' && !/^\d{4}$/.test(val)) { input.style.borderColor = 'var(--danger)'; setTimeout(() => input.style.borderColor = '', 1500); return; } if (CFG[biz][key].includes(val)) { input.value = ''; return; } CFG[biz][key].push(val); persistCFG(); input.value = ''; renderTagList(biz, type); if (type === 'props' && STATE.business === biz) { buildPropertyList(); } }
 function removeTag(biz, key, index) { CFG[biz][key].splice(index, 1); persistCFG(); renderTagList(biz, key === 'cards' ? 'cards' : 'props'); if (key === 'props' && STATE.business === biz) { buildPropertyList(); if (STATE.property && !CFG[biz].props.includes(STATE.property)) { STATE.property = null; } } }
@@ -1435,6 +1582,7 @@ async function fetchPmCommandCenterData(forceRefresh) {
   if (!data.success) throw new Error(data.error || 'Failed to sync with Property Manager script');
   PM_STATE.leases = Array.isArray(data.leases) ? data.leases : [];
   PM_STATE.workOrders = Array.isArray(data.workOrders) ? data.workOrders : [];
+  PM_STATE.vendors = Array.isArray(data.vendors) ? data.vendors : [];
   PM_STATE.specs = Array.isArray(data.specs) ? data.specs : [];
   PM_STATE.loaded = true;
 }
