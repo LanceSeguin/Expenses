@@ -2081,7 +2081,7 @@ function renderHistory() {
   if (SESSION_HISTORY.length === 0) { panel.style.display = 'none'; return; }
   panel.style.display = 'block'; list.innerHTML = '';
   SESSION_HISTORY.forEach(e => {
-    const amt = parseFloat(e.amount) || 0; const amtFmt = (amt >= 0 ? '+' : '-') + '$' + Math.abs(amt).toFixed(2); const amtClass = amt >= 0 ? 'history-amount-pos' : 'history-amount-neg'; const confirmed = e.row ? '✓ row ' + e.row : '~ unconfirmed'; const confirmedClass = e.row ? 'history-confirmed' : 'history-unconfirmed'; const typeIcon = e.type === 'rent' ? '🏠' : '🧾'; const name = e.vendor || e.tenantName || '—'; const sub = [e.property, e.purpose || 'Rent', formatHistoryDate(e.date)].filter(Boolean).join(' · ');
+    const amt = parseFloat(e.amount) || 0; const amtFmt = (amt >= 0 ? '+' : '-') + '$' + Math.abs(amt).toFixed(2); const amtClass = amt >= 0 ? 'history-amount-pos' : 'history-amount-neg'; const confirmed = e.row ? '✓ row ' + e.row : '~ unconfirmed'; const confirmedClass = e.row ? 'history-confirmed' : 'history-unconfirmed'; const typeIcon = e.type === 'rent' ? '🏠' : (e.type === 'reps' ? '⏱️' : '🧾'); const name = e.vendor || e.tenantName || '—'; const sub = [e.property, e.purpose || (e.type === 'reps' ? 'REPS' : 'Rent'), formatHistoryDate(e.date)].filter(Boolean).join(' · ');
     const item = document.createElement('div'); item.className = 'history-item'; item.innerHTML = `<span style="font-size:13px;flex-shrink:0;opacity:0.6">${typeIcon}</span><div class="history-item-left"><div class="history-item-title">${name}</div><div class="history-item-sub">${sub} <span class="${confirmedClass}">${confirmed}</span></div></div><div class="history-item-amount ${amtClass}">${amtFmt}</div>`; list.appendChild(item);
   });
 }
@@ -2139,7 +2139,7 @@ function parseRentDateInput(val) {
     if (mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31 && yr >= 2020 && yr <= 2035) { const d = new Date(yr, mo-1, dy); if (!isNaN(d)) { RENT_STATE.rentDate = d; RENT_STATE.rentCalYear = yr; RENT_STATE.rentCalMonth = mo - 1; renderRentCalendar(); updateRentDescription(); checkRentNext(); } }
   }
 }
-function rentCalNav(dir) { RENT_STATE.rentCalMonth += dir; if (RENT_STATE.rentCalMonth > 11) { RENT_STATE.rentCalMonth = 0; RENT_STATE.rentCalYear++; } if (RENT_STATE.rentCalMonth < 0) { RENT_STATE.rentCalMonth = 11; RENT_STATE.rentCalYear--; } renderRentCalendar(); }
+function rentCalNav(dir) { RENT_STATE.rentCalMonth += dir; if (RENT_STATE.rentCalMonth > 11) { RENT_STATE.rentCalMonth = 0; RENT_STATE.rentCalYear++; } if (RENT_STATE.rentCalMonth < 0)  { RENT_STATE.rentCalMonth = 11; RENT_STATE.rentCalYear--; } renderRentCalendar(); }
 function renderRentCalendar() {
   const months = ['January','February','March','April','May','June','July','August','September','October','November','December']; document.getElementById('rentCalMonthYear').textContent = months[RENT_STATE.rentCalMonth] + ' ' + RENT_STATE.rentCalYear;
   const cells = document.getElementById('rentCalCells'); cells.innerHTML = '';
@@ -2166,6 +2166,53 @@ async function submitRent() {
     RENT_STATE.selectedTenant = null; RENT_STATE.rentDate = null; document.getElementById('rentDateInput').value = ''; document.getElementById('rentAmountInput').value = ''; document.getElementById('rentDescInput').value = ''; document.getElementById('rentDateWrap').style.display = 'none'; document.getElementById('rentCalWrap').style.display = 'none'; document.getElementById('rentAmountWrap').style.display = 'none'; document.getElementById('rentDescWrap').style.display = 'none'; RENT_STATE.tenants = []; RENT_STATE.selectedProperty = null; RENT_STATE.selectedBusiness = null; document.getElementById('rentPropertyPicker').style.display = 'none'; document.getElementById('rentPropertyList').innerHTML = '';
     goToScreen('success');
   } catch(err) { btn.disabled = false; btn.textContent = 'Submit Rent Entry'; document.getElementById('rentError').textContent = 'Failed: ' + err.message; document.getElementById('rentError').style.display = 'block'; }
+}
+
+// ════════════════════════════════════════════
+// REPS ENTRY (FULLY RESTORED)
+// ════════════════════════════════════════════
+const REPS_STATE = { date: null, calYear: new Date().getFullYear(), calMonth: new Date().getMonth() };
+
+function initRepsScreen() {
+  const errEl = document.getElementById('repsError'); if (errEl) errEl.style.display = 'none';
+  document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected'));
+  if (!REPS_STATE.date) { const today = new Date(); REPS_STATE.date = today; REPS_STATE.calYear = today.getFullYear(); REPS_STATE.calMonth = today.getMonth(); document.getElementById('repsDateInput').value = (today.getMonth()+1) + '/' + today.getDate() + '/' + today.getFullYear(); }
+  renderRepsCalendar(); checkRepsNext();
+}
+function handleRepsDateInput(val) { const digits = val.replace(/\D/g, ''); let fmt = digits; if (digits.length > 2) fmt = digits.substring(0,2) + '/' + digits.substring(2); if (digits.length > 4) fmt = digits.substring(0,2) + '/' + digits.substring(2,4) + '/' + digits.substring(4,8); const input = document.getElementById('repsDateInput'); if (fmt !== val) input.value = fmt; parseRepsDateInput(fmt); }
+function parseRepsDateInput(val) {
+  const parts = val.split('/');
+  if (parts.length === 3) { const mo = parseInt(parts[0]), dy = parseInt(parts[1]); let yr = parseInt(parts[2]); if (yr < 100) yr += 2000; if (mo >= 1 && mo <= 12 && dy >= 1 && dy <= 31 && yr >= 2020 && yr <= 2035) { const d = new Date(yr, mo-1, dy); if (!isNaN(d)) { REPS_STATE.date = d; REPS_STATE.calYear = yr; REPS_STATE.calMonth = mo - 1; renderRepsCalendar(); checkRepsNext(); } } }
+}
+function repsCalNav(dir) { REPS_STATE.calMonth += dir; if (REPS_STATE.calMonth > 11) { REPS_STATE.calMonth = 0; REPS_STATE.calYear++; } if (REPS_STATE.calMonth < 0)  { REPS_STATE.calMonth = 11; REPS_STATE.calYear--; } renderRepsCalendar(); }
+function renderRepsCalendar() {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December']; document.getElementById('repsCalMonthYear').textContent = months[REPS_STATE.calMonth] + ' ' + REPS_STATE.calYear;
+  const cells = document.getElementById('repsCalCells'); cells.innerHTML = '';
+  const firstDay = new Date(REPS_STATE.calYear, REPS_STATE.calMonth, 1).getDay(); const daysInMonth = new Date(REPS_STATE.calYear, REPS_STATE.calMonth + 1, 0).getDate(); const today = new Date();
+  for (let i = 0; i < firstDay; i++) { const el = document.createElement('div'); el.className = 'cal-cell empty'; cells.appendChild(el); }
+  for (let d = 1; d <= daysInMonth; d++) {
+    const el = document.createElement('div'); el.className = 'cal-cell'; el.textContent = d; const cellDate = new Date(REPS_STATE.calYear, REPS_STATE.calMonth, d);
+    if (today.toDateString() === cellDate.toDateString()) el.classList.add('today'); if (REPS_STATE.date && REPS_STATE.date.toDateString() === cellDate.toDateString()) el.classList.add('selected');
+    el.onclick = () => { REPS_STATE.date = new Date(REPS_STATE.calYear, REPS_STATE.calMonth, d); document.getElementById('repsDateInput').value = (REPS_STATE.calMonth+1) + '/' + d + '/' + REPS_STATE.calYear; renderRepsCalendar(); checkRepsNext(); };
+    cells.appendChild(el);
+  }
+}
+function selectRepsPlace(name, btn) { document.getElementById('repsPlaceInput').value = name; document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected')); btn.classList.add('selected'); checkRepsNext(); }
+function onRepsPlaceTyped() { document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected')); checkRepsNext(); }
+function clearRepsPlace() { document.getElementById('repsPlaceInput').value = ''; document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected')); checkRepsNext(); }
+function checkRepsNext() { const hasDate = !!REPS_STATE.date; const hasPlace = document.getElementById('repsPlaceInput').value.trim().length > 0; const timeVal = parseFloat(document.getElementById('repsTimeInput').value); const hasTime = !isNaN(timeVal) && timeVal > 0; const hasTask = document.getElementById('repsTaskInput').value.trim().length > 0; document.getElementById('repsSubmitBtn').disabled = !(hasDate && hasPlace && hasTime && hasTask); }
+async function submitReps() {
+  const btn = document.getElementById('repsSubmitBtn'); const errEl = document.getElementById('repsError'); btn.disabled = true; btn.textContent = 'Submitting…'; errEl.style.display = 'none';
+  const d = REPS_STATE.date; const dateStr = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  const payload = { action: 'addReps', date: dateStr, place: document.getElementById('repsPlaceInput').value.trim(), timeSpent: parseFloat(document.getElementById('repsTimeInput').value), task: document.getElementById('repsTaskInput').value.trim() };
+  try {
+    await fetch(CFG.webAppUrl, { method: 'POST', mode: 'no-cors', body: JSON.stringify(payload) });
+    addToHistory({ type: 'reps', vendor: payload.place, property: payload.place, purpose: 'REPS', amount: 0, description: payload.task.substring(0, 30), date: dateStr, tab: 'REPS', timestamp: new Date().toISOString() });
+    document.getElementById('successDetail').innerHTML = `REPS entry recorded in <strong>REPS sheet</strong><br>${payload.place} &middot; ${payload.timeSpent}h &middot; <span style="color:var(--text-muted);font-size:12px">${payload.task.substring(0,40)}${payload.task.length>40?'…':''}</span>`;
+    document.getElementById('driveStatus').style.display = 'none';
+    REPS_STATE.date = null; document.getElementById('repsDateInput').value = ''; document.getElementById('repsPlaceInput').value = ''; document.querySelectorAll('#repsPlaceBtns .cat-card').forEach(b => b.classList.remove('selected')); document.getElementById('repsTimeInput').value = ''; document.getElementById('repsTaskInput').value = '';
+    goToScreen('success');
+  } catch(err) { btn.disabled = false; btn.textContent = 'Submit REPS Entry'; errEl.textContent = 'Failed: ' + err.message; errEl.style.display = 'block'; }
 }
 
 let propertyTotalsCache = null;
@@ -2306,108 +2353,6 @@ window.addEventListener('DOMContentLoaded', () => {
   if (!CFG.webAppUrl && !CFG.pmWebAppUrl) { document.querySelectorAll('.screen').forEach(s => s.classList.remove('active')); document.getElementById('screen-config').classList.add('active'); document.getElementById('settingsOpenBtn').style.display = 'none'; } 
   else { document.getElementById('settingsOpenBtn').style.display = 'flex'; goToScreen('hub'); syncPropertiesFromSheet(); }
 });
-// --- NEW TENANT LOGIC ---
-function openNewTenantModal() {
-  const sel = document.getElementById('newTenantAddress');
-  sel.innerHTML = '<option value="">Select Property...</option>';
-  
-  // Extract unique properties from the PM_STATE leases
-  const uniqueProps = [...new Set(PM_STATE.leases.map(l => l.address))].filter(Boolean).sort();
-  uniqueProps.forEach(addr => {
-    const opt = document.createElement('option');
-    opt.value = addr; opt.textContent = addr;
-    sel.appendChild(opt);
-  });
-  
-  document.getElementById('newTenantName').value = '';
-  document.getElementById('newTenantPhone').value = '';
-  document.getElementById('newTenantEmail').value = '';
-  document.getElementById('newTenantRent').value = '';
-  document.getElementById('newTenantTerm').value = '12';
-  
-  const today = new Date();
-  document.getElementById('newTenantStartDate').value = `${today.getMonth()+1}/${today.getDate()}/${today.getFullYear()}`;
-  
-  document.getElementById('newTenantError').style.display = 'none';
-  document.getElementById('newTenantModal').classList.add('open');
-}
-
-async function autofillNewTenantBaseline() {
-  const address = document.getElementById('newTenantAddress').value;
-  if (!address) {
-    document.getElementById('newTenantRent').value = '';
-    return;
-  }
-  
-  document.getElementById('newTenantRent').placeholder = 'Fetching...';
-  
-  try {
-    const params = new URLSearchParams({ action: 'get_property_baseline', address: address });
-    if (CFG.pmSecret && CFG.pmSecret !== 'REPLACE_WITH_A_LONG_RANDOM_STRING') params.set('secret', CFG.pmSecret);
-    
-    const resp = await fetch(CFG.pmWebAppUrl + '?' + params.toString());
-    const data = await resp.json();
-    
-    if (data.success && data.baseline) {
-      document.getElementById('newTenantRent').value = data.baseline.rent || '';
-      document.getElementById('newTenantTerm').value = data.baseline.term || '12';
-    }
-  } catch(e) {
-    console.warn("Failed to fetch baseline rent", e);
-  } finally {
-    document.getElementById('newTenantRent').placeholder = '$0.00';
-  }
-}
-
-async function submitNewTenantLease() {
-  const address = document.getElementById('newTenantAddress').value;
-  const name = document.getElementById('newTenantName').value.trim();
-  const phone = document.getElementById('newTenantPhone').value.trim();
-  const email = document.getElementById('newTenantEmail').value.trim();
-  const startDate = document.getElementById('newTenantStartDate').value.trim();
-  const term = document.getElementById('newTenantTerm').value.trim();
-  const rent = document.getElementById('newTenantRent').value.trim();
-  
-  const errEl = document.getElementById('newTenantError');
-  const btn = document.getElementById('newTenantSubmitBtn');
-  
-  if (!address || !name || !startDate || !rent) {
-    errEl.textContent = 'Address, Name, Start Date, and Rent are required.';
-    errEl.style.display = 'block';
-    return;
-  }
-  
-  btn.disabled = true;
-  btn.textContent = 'Executing...';
-  errEl.style.display = 'none';
-  
-  try {
-    await postPmCommandCenter({
-      action: 'lease_action',
-      isExtension: false,
-      leaseData: {
-        Action: 'Execute',
-        Property_Address: address,
-        Tenant1_Name: name,
-        Tenant1_Phone: phone,
-        Tenant1_Email: email,
-        Start_Date: startDate,
-        Lease_Term: term,
-        Monthly_Rent: rent
-      }
-    });
-    
-    closeModal('newTenantModal');
-    PM_STATE.loaded = false;
-    await initLeasesScreen();
-  } catch (err) {
-    errEl.textContent = err.message;
-    errEl.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = 'Execute & Send Signature Link';
-  }
-}
 </script>
 </body>
 </html>
