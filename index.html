@@ -1158,12 +1158,12 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     <div id="leaseTabRenew">
       <div style="font-size:11px;color:var(--text-muted);margin-bottom:12px;line-height:1.45;">Prepare a lease extension on the <strong>Lease Extension Generator</strong> tab. Dates auto-advance from the current end date.</div>
       <div class="two-col-grid">
-        <div class="field-wrap"><label class="field-label">New Start Date</label><div class="field-input-wrap"><input type="text" id="extStartDate" placeholder="M/D/YYYY" oninput="recalcExtensionEndDate()" /></div></div>
+        <div class="field-wrap"><label class="field-label">New Start Date</label><div class="field-input-wrap"><input type="date" id="extStartDate" onchange="recalcExtensionEndDate()" /></div></div>
         <div class="field-wrap"><label class="field-label">Term (Months)</label><div class="field-input-wrap"><input type="number" id="extTermMonths" value="12" min="1" max="36" oninput="recalcExtensionEndDate()" /></div></div>
       </div>
       <div class="two-col-grid">
-        <div class="field-wrap"><label class="field-label">New End Date</label><div class="field-input-wrap"><input type="text" id="extEndDate" placeholder="M/D/YYYY" /></div></div>
-        <div class="field-wrap"><label class="field-label">Monthly Rent</label><div class="field-input-wrap"><input type="text" id="extMonthlyRent" placeholder="$1,200.00" inputmode="decimal" /></div></div>
+        <div class="field-wrap"><label class="field-label">New End Date</label><div class="field-input-wrap"><input type="date" id="extEndDate" /></div></div>
+        <div class="field-wrap"><label class="field-label">Monthly Rent</label><div class="field-input-wrap"><input type="tel" id="extMonthlyRent" placeholder="$0.00" onfocus="cleanRentInput(this)" onblur="formatRentInput(this)" /></div></div>
       </div>
       <div id="leaseModalError" class="error-msg" style="display:none"></div>
       <div class="modal-actions">
@@ -1218,10 +1218,10 @@ const HARDCODED_PM_SECRET      = 'REPLACE_WITH_A_LONG_RANDOM_STRING';
     </div>
     
     <div class="two-col-grid">
-      <div class="field-wrap"><label class="field-label">Start Date</label><div class="field-input-wrap"><input type="text" id="newTenantStartDate" placeholder="M/D/YYYY" inputmode="numeric" /></div></div>
+      <div class="field-wrap"><label class="field-label">Start Date</label><div class="field-input-wrap"><input type="date" id="newTenantStartDate" /></div></div>
       <div class="field-wrap"><label class="field-label">Term (Months)</label><div class="field-input-wrap"><input type="number" id="newTenantTerm" value="12" /></div></div>
     </div>
-    <div class="field-wrap"><label class="field-label">Monthly Rent</label><div class="field-input-wrap"><input type="text" id="newTenantRent" placeholder="$0.00" inputmode="decimal" /></div></div>
+    <div class="field-wrap"><label class="field-label">Monthly Rent</label><div class="field-input-wrap"><input type="tel" id="newTenantRent" placeholder="$0.00" onfocus="cleanRentInput(this)" onblur="formatRentInput(this)" /></div></div>
     
     <div id="newTenantError" class="error-msg" style="display:none"></div>
     <div class="modal-actions">
@@ -1431,6 +1431,9 @@ function goBackFromVendor() { goToScreen(STATE.isBusinessExpense ? 'business' : 
 function editProperty() { goToScreen(STATE.isBusinessExpense ? 'business' : 'property'); }
 function closeModal(modalId) { const el = document.getElementById(modalId); if (el) el.classList.remove('open'); }
 
+// ════════════════════════════════════════════
+// COMMAND CENTER DATA ENGINE (AI PM BACKEND)
+// ════════════════════════════════════════════
 async function fetchPmCommandCenterData(forceRefresh) {
   if (PM_STATE.loaded && !forceRefresh) return;
   if (!CFG.pmWebAppUrl) return;
@@ -1458,7 +1461,6 @@ async function postPmCommandCenter(payload) {
 async function refreshCommandCenter(force) {
   const statusLine = document.getElementById('hubStatusLine');
   if (force && statusLine) statusLine.textContent = 'Syncing live portfolio & financial data…';
-
   try {
     await fetchPmCommandCenterData(force);
     const activeWos = PM_STATE.workOrders.filter(w => w.bucket === 'active').length;
@@ -1478,7 +1480,6 @@ async function refreshCommandCenter(force) {
     document.getElementById('hubWoCount').textContent = '!'; document.getElementById('hubWoSub').textContent = 'Check PM URL in ⚙';
     if (statusLine) statusLine.textContent = 'PM Sync note: ' + err.message;
   }
-
   if (CFG.webAppUrl) {
     try {
       const yr = new Date().getFullYear();
@@ -1492,6 +1493,9 @@ async function refreshCommandCenter(force) {
   }
 }
 
+// ════════════════════════════════════════════
+// WORK ORDERS SCREEN & OPERATIONS
+// ════════════════════════════════════════════
 async function initWorkOrdersScreen() {
   const loading = document.getElementById('woLoading'); const errEl = document.getElementById('woError'); errEl.style.display = 'none';
   if (!PM_STATE.loaded) { loading.style.display = 'flex'; document.getElementById('woList').innerHTML = ''; }
@@ -1546,6 +1550,9 @@ async function submitNewWorkOrder() {
   try { await postPmCommandCenter({ action: 'create_work_order', address: address, tenantName: document.getElementById('newWoTenant').value.trim() || 'Tenant', tenantPhone: document.getElementById('newWoPhone').value.trim(), category: document.getElementById('newWoCategory').value, urgency: document.getElementById('newWoUrgency').value, issue: issue, notifyTenant: document.getElementById('newWoNotifyToggle').classList.contains('active') }); closeModal('woCreateModal'); PM_STATE.loaded = false; await initWorkOrdersScreen(); } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; } finally { btn.disabled = false; btn.textContent = 'Create Work Order'; }
 }
 
+// ════════════════════════════════════════════
+// LEASES & EXPIRATIONS SCREEN & OPERATIONS
+// ════════════════════════════════════════════
 async function initLeasesScreen() {
   const loading = document.getElementById('leaseLoading'); const errEl = document.getElementById('leaseError'); errEl.style.display = 'none';
   if (!PM_STATE.loaded) { loading.style.display = 'flex'; document.getElementById('leaseList').innerHTML = ''; }
@@ -1582,38 +1589,102 @@ function renderLeasesList() {
     container.appendChild(card);
   });
 }
+
+// FORMATTERS & HELPERS
+function formatRentInput(el) {
+  if (!el.value) return;
+  let num = parseFloat(el.value.replace(/[^0-9.]/g, ''));
+  if (isNaN(num)) { el.value = ''; return; }
+  el.value = '$' + num.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+function cleanRentInput(el) {
+  if (!el.value) return;
+  el.value = el.value.replace(/[^0-9.]/g, '');
+}
+function formatToSheetDate(isoStr) {
+  if(!isoStr) return '';
+  const [y, m, d] = isoStr.split('-');
+  if (!y || !m || !d) return isoStr;
+  return `${parseInt(m, 10)}/${parseInt(d, 10)}/${y}`;
+}
+
 function openLeaseModal(lease) {
   PM_STATE.selectedLease = lease;
-  document.getElementById('leaseModalBiz').textContent = lease.business || 'Portfolio'; document.getElementById('leaseModalAddress').textContent = lease.address; document.getElementById('leaseModalTenant').textContent = `${lease.displayName} · ${lease.tenant1Phone || 'No phone'}`; document.getElementById('leaseModalDates').textContent = `${lease.startDate || '—'} to ${lease.endDate || '—'}`; document.getElementById('leaseModalRent').textContent = `${lease.monthlyRent || '—'} / ${lease.securityDeposit || '—'}`; document.getElementById('leaseModalDocStatus').textContent = `${lease.status} (${lease.docType === 'ext' ? 'Extension Tab' : 'Master Tab'})`;
+  document.getElementById('leaseModalBiz').textContent = lease.business || 'Portfolio'; 
+  document.getElementById('leaseModalAddress').textContent = lease.address; 
+  document.getElementById('leaseModalTenant').textContent = `${lease.displayName} · ${lease.tenant1Phone || 'No phone'}`; 
+  document.getElementById('leaseModalDates').textContent = `${lease.startDate || '—'} to ${lease.endDate || '—'}`; 
+  document.getElementById('leaseModalRent').textContent = `${lease.monthlyRent || '—'} / ${lease.securityDeposit || '—'}`; 
+  document.getElementById('leaseModalDocStatus').textContent = `${lease.status} (${lease.docType === 'ext' ? 'Extension Tab' : 'Master Tab'})`;
+  
   const badge = document.getElementById('leaseModalBadge');
-  if (lease.daysRemaining !== null && lease.daysRemaining < 0) { badge.textContent = `Expired ${Math.abs(lease.daysRemaining)}d`; badge.className = 'status-pill pill-danger'; } else if (lease.daysRemaining !== null && lease.daysRemaining <= 65) { badge.textContent = `${lease.daysRemaining}d left`; badge.className = 'status-pill pill-warning'; } else { badge.textContent = lease.status || 'Active'; badge.className = 'status-pill pill-success'; }
+  if (lease.daysRemaining !== null && lease.daysRemaining < 0) { badge.textContent = `Expired ${Math.abs(lease.daysRemaining)}d`; badge.className = 'status-pill pill-danger'; } 
+  else if (lease.daysRemaining !== null && lease.daysRemaining <= 65) { badge.textContent = `${lease.daysRemaining}d left`; badge.className = 'status-pill pill-warning'; } 
+  else { badge.textContent = lease.status || 'Active'; badge.className = 'status-pill pill-success'; }
+  
   let nextStart = new Date();
-  if (lease.endDate) { const parsedEnd = new Date(lease.endDate.replace(/-/g, '/')); if (!isNaN(parsedEnd.getTime())) { nextStart = new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate() + 1); } }
-  document.getElementById('extStartDate').value = `${nextStart.getMonth() + 1}/${nextStart.getDate()}/${nextStart.getFullYear()}`; document.getElementById('extTermMonths').value = 12; document.getElementById('extMonthlyRent').value = lease.monthlyRent || '';
+  if (lease.endDate) { 
+    const parsedEnd = new Date(lease.endDate.replace(/-/g, '/')); 
+    if (!isNaN(parsedEnd.getTime())) { nextStart = new Date(parsedEnd.getFullYear(), parsedEnd.getMonth(), parsedEnd.getDate() + 1); } 
+  }
+  
+  const sy = nextStart.getFullYear();
+  const sm = String(nextStart.getMonth() + 1).padStart(2, '0');
+  const sd = String(nextStart.getDate()).padStart(2, '0');
+  
+  document.getElementById('extStartDate').value = `${sy}-${sm}-${sd}`; 
+  document.getElementById('extTermMonths').value = 12; 
+  
+  const rentEl = document.getElementById('extMonthlyRent');
+  rentEl.value = lease.monthlyRent || '';
+  formatRentInput(rentEl);
+  
   recalcExtensionEndDate();
-  document.getElementById('leaseSmsPhone').value = lease.tenant1Phone || ''; document.getElementById('leaseSmsBody').value = ''; document.getElementById('leaseModalError').style.display = 'none'; document.getElementById('leaseSmsError').style.display = 'none';
-  switchLeaseModalTab('renew'); document.getElementById('leaseDetailModal').classList.add('open');
+  
+  document.getElementById('leaseSmsPhone').value = lease.tenant1Phone || ''; 
+  document.getElementById('leaseSmsBody').value = ''; 
+  document.getElementById('leaseModalError').style.display = 'none'; 
+  document.getElementById('leaseSmsError').style.display = 'none';
+  
+  switchLeaseModalTab('renew'); 
+  document.getElementById('leaseDetailModal').classList.add('open');
 }
+
 function switchLeaseModalTab(tab) { document.getElementById('leaseTabRenew').style.display = tab === 'renew' ? 'block' : 'none'; document.getElementById('leaseTabSms').style.display = tab === 'sms' ? 'block' : 'none'; document.getElementById('leaseTabRenewBtn').classList.toggle('selected', tab === 'renew'); document.getElementById('leaseTabSmsBtn').classList.toggle('selected', tab === 'sms'); }
+
 function recalcExtensionEndDate() {
-  const startStr = document.getElementById('extStartDate').value.trim(); const months = parseInt(document.getElementById('extTermMonths').value, 10);
+  const startStr = document.getElementById('extStartDate').value; 
+  const months = parseInt(document.getElementById('extTermMonths').value, 10);
   if (!startStr || isNaN(months) || months < 1) return;
-  const d = new Date(startStr.replace(/-/g, '/')); if (isNaN(d.getTime())) return;
-  const end = new Date(d.getFullYear(), d.getMonth() + months, d.getDate() - 1);
-  document.getElementById('extEndDate').value = `${end.getMonth() + 1}/${end.getDate()}/${end.getFullYear()}`;
+  const [y, m, d] = startStr.split('-').map(Number);
+  const end = new Date(y, m - 1 + months, d - 1);
+  const ey = end.getFullYear();
+  const em = String(end.getMonth() + 1).padStart(2, '0');
+  const ed = String(end.getDate()).padStart(2, '0');
+  document.getElementById('extEndDate').value = `${ey}-${em}-${ed}`;
 }
+
 async function submitLeaseExtension(actionMode) {
   const lease = PM_STATE.selectedLease; if (!lease) return;
-  const startDate = document.getElementById('extStartDate').value.trim(); const leaseTerm = document.getElementById('extTermMonths').value.trim(); const endDate = document.getElementById('extEndDate').value.trim(); const monthlyRent = document.getElementById('extMonthlyRent').value.trim();
-  const errEl = document.getElementById('leaseModalError'); if (!startDate || !endDate || !monthlyRent) { errEl.textContent = 'Start Date, End Date, and Monthly Rent are required.'; errEl.style.display = 'block'; return; }
+  
+  const startDate = formatToSheetDate(document.getElementById('extStartDate').value); 
+  const leaseTerm = document.getElementById('extTermMonths').value.trim(); 
+  const endDate = formatToSheetDate(document.getElementById('extEndDate').value); 
+  const monthlyRent = document.getElementById('extMonthlyRent').value.trim();
+  
+  const errEl = document.getElementById('leaseModalError'); 
+  if (!startDate || !endDate || !monthlyRent) { errEl.textContent = 'Start Date, End Date, and Monthly Rent are required.'; errEl.style.display = 'block'; return; }
+  
   const execBtn = document.getElementById('extExecuteBtn'); const draftBtn = document.getElementById('extDraftBtn');
   execBtn.disabled = true; draftBtn.disabled = true; errEl.style.display = 'none';
+  
   try {
     await postPmCommandCenter({ action: 'lease_action', isExtension: true, leaseData: { Action: 'Draft', Property_Address: lease.address, Tenant1_Name: lease.tenant1Name, Start_Date: startDate, Lease_Term: leaseTerm, End_Date: endDate, Monthly_Rent: monthlyRent } });
     if (actionMode === 'Execute') await postPmCommandCenter({ action: 'lease_action', isExtension: true, leaseData: { Action: 'Execute', Property_Address: lease.address, Tenant1_Name: lease.tenant1Name } });
     closeModal('leaseDetailModal'); PM_STATE.loaded = false; await initLeasesScreen();
   } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; } finally { execBtn.disabled = false; draftBtn.disabled = false; }
 }
+
 function fillRenewalCheckinSms() {
   const lease = PM_STATE.selectedLease; if (!lease) return;
   const firstName = (lease.tenant1Name || 'there').split(/\s+/)[0];
@@ -1625,6 +1696,99 @@ async function sendDirectLeaseSms() {
   if (!to || !message) { errEl.textContent = 'Recipient phone and message are required.'; errEl.style.display = 'block'; return; }
   btn.disabled = true; btn.textContent = 'Sending…'; errEl.style.display = 'none';
   try { await postPmCommandCenter({ action: 'send_sms', to: to, message: message }); closeModal('leaseDetailModal'); } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; } finally { btn.disabled = false; btn.textContent = 'Send SMS Now'; }
+}
+
+function openNewTenantModal() {
+  const sel = document.getElementById('newTenantAddress');
+  sel.innerHTML = '<option value="">Select Property...</option>';
+  const uniqueProps = [...new Set(PM_STATE.leases.map(l => l.address))].filter(Boolean).sort();
+  uniqueProps.forEach(addr => {
+    const opt = document.createElement('option');
+    opt.value = addr; opt.textContent = addr;
+    sel.appendChild(opt);
+  });
+  
+  document.getElementById('newTenantName').value = '';
+  document.getElementById('newTenantPhone').value = '';
+  document.getElementById('newTenantEmail').value = '';
+  document.getElementById('newTenantRent').value = '';
+  document.getElementById('newTenantTerm').value = '12';
+  
+  const today = new Date();
+  const ty = today.getFullYear();
+  const tm = String(today.getMonth() + 1).padStart(2, '0');
+  const td = String(today.getDate()).padStart(2, '0');
+  document.getElementById('newTenantStartDate').value = `${ty}-${tm}-${td}`;
+  
+  document.getElementById('newTenantError').style.display = 'none';
+  document.getElementById('newTenantModal').classList.add('open');
+}
+
+async function autofillNewTenantBaseline() {
+  const address = document.getElementById('newTenantAddress').value;
+  const rentInput = document.getElementById('newTenantRent');
+  if (!address) { rentInput.value = ''; return; }
+  
+  rentInput.placeholder = 'Fetching...';
+  
+  try {
+    const params = new URLSearchParams({ action: 'get_property_baseline', address: address });
+    if (CFG.pmSecret && CFG.pmSecret !== 'REPLACE_WITH_A_LONG_RANDOM_STRING') params.set('secret', CFG.pmSecret);
+    const resp = await fetch(CFG.pmWebAppUrl + '?' + params.toString());
+    const data = await resp.json();
+    if (data.success && data.baseline) {
+      rentInput.value = data.baseline.rent || '';
+      formatRentInput(rentInput);
+      document.getElementById('newTenantTerm').value = data.baseline.term || '12';
+    }
+  } catch(e) {
+    console.warn("Failed to fetch baseline rent", e);
+  } finally {
+    rentInput.placeholder = '$0.00';
+  }
+}
+
+async function submitNewTenantLease() {
+  const address = document.getElementById('newTenantAddress').value;
+  const name = document.getElementById('newTenantName').value.trim();
+  const phone = document.getElementById('newTenantPhone').value.trim();
+  const email = document.getElementById('newTenantEmail').value.trim();
+  const startDate = formatToSheetDate(document.getElementById('newTenantStartDate').value);
+  const term = document.getElementById('newTenantTerm').value.trim();
+  const rent = document.getElementById('newTenantRent').value.trim();
+  
+  const errEl = document.getElementById('newTenantError');
+  const btn = document.getElementById('newTenantSubmitBtn');
+  
+  if (!address || !name || !startDate || !rent) { errEl.textContent = 'Address, Name, Start Date, and Rent are required.'; errEl.style.display = 'block'; return; }
+  
+  btn.disabled = true; btn.textContent = 'Executing...'; errEl.style.display = 'none';
+  
+  try {
+    await postPmCommandCenter({
+      action: 'lease_action',
+      isExtension: false,
+      leaseData: {
+        Action: 'Execute',
+        Property_Address: address,
+        Tenant1_Name: name,
+        Tenant1_Phone: phone,
+        Tenant1_Email: email,
+        Start_Date: startDate,
+        Lease_Term: term,
+        Monthly_Rent: rent
+      }
+    });
+    
+    closeModal('newTenantModal');
+    PM_STATE.loaded = false;
+    await initLeasesScreen();
+  } catch (err) {
+    errEl.textContent = err.message; errEl.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Execute & Send Signature Link';
+  }
 }
 
 async function initSpecsScreen() {
@@ -1648,6 +1812,7 @@ function renderSpecsList() {
 }
 function escapeHtml(str) { return String(str || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
 </script>
+  
 <!-- ⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️⬇️ -->
 <!-- MODULE 3B: EXPENSE ENGINE, TRACKING & INIT       -->
 <!-- ⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️⬆️ -->
