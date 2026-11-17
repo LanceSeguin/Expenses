@@ -1318,10 +1318,7 @@ window.onerror = function(msg, src, line, col, err) {
   document.body.innerHTML = '<h2 style="color:#c8a96e">App Error</h2><p>' + msg + '</p><p>Line: ' + line + '</p><p>' + (err ? err.stack : '') + '</p>'; return true;
 };
 
-const DEFAULTS = {
-  LNI: { cards: ['6247','1334','1326','6254'], props: ['Beau Darren','Briarhurst','Cornerstone','Letitia'] },
-  LNEP: { cards: ['3323','4134','4126','3331'], props: ['Rue De Belle Maison','Parkridge'] }
-};
+// DEFAULTS now strictly handled by Property Master tab API payload
 const BUSINESS_NAMES = { LNI: 'LN Investments', LNEP: 'LNE Properties' };
 
 const BUILTIN_STORE_HELPERS = [
@@ -1354,19 +1351,20 @@ function getConfig() {
   return {
     webAppUrl: HARDCODED_WEB_APP_URL.includes('PASTE_') ? '' : HARDCODED_WEB_APP_URL,
     pmWebAppUrl: HARDCODED_PM_WEB_APP_URL || '', pmSecret: HARDCODED_PM_SECRET || '', visionApiKey: HARDCODED_VISION_KEY,
-    LNI: { cards: [...DEFAULTS.LNI.cards], props: [...DEFAULTS.LNI.props] },
-    LNEP: { cards: [...DEFAULTS.LNEP.cards], props: [...DEFAULTS.LNEP.props] }
+    LNI: { cards: ['6247','1334','1326','6254'] }, LNEP: { cards: ['3323','4134','4126','3331'] }
   };
 }
 
 let CFG = getConfig();
+let MASTER_PROPERTIES = []; 
+
 function persistCFG() { saveConfigToStorage(CFG); }
 
 const STATE = { fileBase64: null, fileMimeType: null, scanned: {}, business: null, isBusinessExpense: false, property: null, vendor: '', date: null, purpose: null, amount: null, description: '', calYear: new Date().getFullYear(), calMonth: new Date().getMonth() };
 const PM_STATE = { loaded: false, leases: [], workOrders: [], vendors: [], specs: [], woFilter: 'active', leaseFilter: 'action', selectedWo: null, selectedLease: null };
 
 function openSettings() {
-  renderTagList('LNI', 'cards'); renderTagList('LNEP', 'cards'); renderTagList('LNI', 'props'); renderTagList('LNEP', 'props'); renderPropAbbrList(); renderStoreHelperList(); loadNotifySettings();
+  renderTagList('LNI', 'cards'); renderTagList('LNEP', 'cards'); renderStoreHelperList(); loadNotifySettings();
   const urlEl = document.getElementById('settWebAppUrl'); if (urlEl) urlEl.value = CFG.webAppUrl || '';
   const pmUrlEl = document.getElementById('settPmWebAppUrl'); if (pmUrlEl) pmUrlEl.value = CFG.pmWebAppUrl || '';
   const pmSecEl = document.getElementById('settPmSecret'); if (pmSecEl) pmSecEl.value = CFG.pmSecret || '';
@@ -1381,13 +1379,8 @@ function savePmSettings() { const pmUrl = document.getElementById('settPmWebAppU
 // SHARED PREFERRED VENDORS MANAGER (GOOGLE SHEETS)
 // ════════════════════════════════════════════
 async function loadSharedVendorsInSettings() {
-  const loading = document.getElementById('sharedVendorsLoading');
-  const errEl = document.getElementById('sharedVendorsError');
-  if (errEl) errEl.style.display = 'none';
-  if (!CFG.pmWebAppUrl) {
-    renderSharedVendorsList();
-    return;
-  }
+  const loading = document.getElementById('sharedVendorsLoading'); const errEl = document.getElementById('sharedVendorsError'); if (errEl) errEl.style.display = 'none';
+  if (!CFG.pmWebAppUrl) { renderSharedVendorsList(); return; }
   if (loading) loading.style.display = 'flex';
   try {
     const params = new URLSearchParams({ action: 'get_vendors', _t: Date.now() });
@@ -1396,134 +1389,54 @@ async function loadSharedVendorsInSettings() {
     const data = await resp.json();
     if (!data.success) throw new Error(data.error || 'Failed to fetch vendors');
     PM_STATE.vendors = Array.isArray(data.vendors) ? data.vendors : [];
-  } catch (err) {
-    if (errEl) { errEl.textContent = 'Sync error: ' + err.message; errEl.style.display = 'block'; }
-  } finally {
-    if (loading) loading.style.display = 'none';
-    renderSharedVendorsList();
-  }
+  } catch (err) { if (errEl) { errEl.textContent = 'Sync error: ' + err.message; errEl.style.display = 'block'; }
+  } finally { if (loading) loading.style.display = 'none'; renderSharedVendorsList(); }
 }
 
 function renderSharedVendorsList() {
-  const container = document.getElementById('sharedVendorsList');
-  if (!container) return;
-  container.innerHTML = '';
-
-  if (!PM_STATE.vendors || PM_STATE.vendors.length === 0) {
-    container.innerHTML = '<div class="tag-empty">No preferred vendors saved yet. Add your primary vendor below.</div>';
-    return;
-  }
-
+  const container = document.getElementById('sharedVendorsList'); if (!container) return; container.innerHTML = '';
+  if (!PM_STATE.vendors || PM_STATE.vendors.length === 0) { container.innerHTML = '<div class="tag-empty">No preferred vendors saved yet. Add your primary vendor below.</div>'; return; }
   PM_STATE.vendors.forEach((v, idx) => {
-    const card = document.createElement('div');
-    card.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);';
+    const card = document.createElement('div'); card.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;margin-bottom:8px;background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius-sm);';
     const contactStr = [v.email, v.phone].filter(Boolean).join(' · ') || 'No contact info';
-    card.innerHTML = `
-      <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;">
-        <div style="width:24px;height:24px;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">#${idx + 1}</div>
-        <div style="min-width:0;flex:1;">
-          <div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(v.name)} <span style="font-size:11px;font-weight:500;color:var(--accent);">(${escapeHtml(v.category)})</span></div>
-          <div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(contactStr)}</div>
-        </div>
-      </div>
-      <div style="display:flex;align-items:center;gap:4px;flex-shrink:0;">
-        <button onclick="moveSharedVendor(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="Move Up (Higher Priority)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;width:26px;height:26px;cursor:pointer;opacity:${idx === 0 ? '0.35' : '1'};">↑</button>
-        <button onclick="moveSharedVendor(${idx}, 1)" ${idx === PM_STATE.vendors.length - 1 ? 'disabled' : ''} title="Move Down (Lower Priority)" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;width:26px;height:26px;cursor:pointer;opacity:${idx === PM_STATE.vendors.length - 1 ? '0.35' : '1'};">↓</button>
-        <button onclick="removeSharedVendor(${idx})" title="Remove Vendor" class="tag-remove" style="margin-left:2px;">×</button>
-      </div>
-    `;
+    card.innerHTML = `<div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0;"><div style="width:24px;height:24px;border-radius:50%;background:var(--accent-dim);color:var(--accent);font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">#${idx + 1}</div><div style="min-width:0;flex:1;"><div style="font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(v.name)} <span style="font-size:11px;font-weight:500;color:var(--accent);">(${escapeHtml(v.category)})</span></div><div style="font-size:11px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(contactStr)}</div></div></div><div style="display:flex;align-items:center;gap:4px;flex-shrink:0;"><button onclick="moveSharedVendor(${idx}, -1)" ${idx === 0 ? 'disabled' : ''} title="Move Up" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;width:26px;height:26px;cursor:pointer;opacity:${idx === 0 ? '0.35' : '1'};">↑</button><button onclick="moveSharedVendor(${idx}, 1)" ${idx === PM_STATE.vendors.length - 1 ? 'disabled' : ''} title="Move Down" style="background:var(--surface);border:1px solid var(--border);color:var(--text);border-radius:6px;width:26px;height:26px;cursor:pointer;opacity:${idx === PM_STATE.vendors.length - 1 ? '0.35' : '1'};">↓</button><button onclick="removeSharedVendor(${idx})" title="Remove Vendor" class="tag-remove" style="margin-left:2px;">×</button></div>`;
     container.appendChild(card);
   });
 }
 
 async function addSharedVendor() {
-  const catEl = document.getElementById('newVendorCat');
-  const nameEl = document.getElementById('newVendorName');
-  const emailEl = document.getElementById('newVendorEmail');
-  const phoneEl = document.getElementById('newVendorPhone');
-  const notesEl = document.getElementById('newVendorNotes');
-  const errEl = document.getElementById('sharedVendorsError');
-
-  const category = catEl.value.trim() || 'General';
-  const name = nameEl.value.trim();
-  const email = emailEl.value.trim();
-  const phone = phoneEl.value.trim();
-  const notes = notesEl.value.trim();
-
-  if (!name) {
-    if (errEl) { errEl.textContent = 'Vendor Name is required.'; errEl.style.display = 'block'; }
-    return;
-  }
+  const catEl = document.getElementById('newVendorCat'); const nameEl = document.getElementById('newVendorName'); const emailEl = document.getElementById('newVendorEmail'); const phoneEl = document.getElementById('newVendorPhone'); const notesEl = document.getElementById('newVendorNotes'); const errEl = document.getElementById('sharedVendorsError');
+  const category = catEl.value.trim() || 'General'; const name = nameEl.value.trim(); const email = emailEl.value.trim(); const phone = phoneEl.value.trim(); const notes = notesEl.value.trim();
+  if (!name) { if (errEl) { errEl.textContent = 'Vendor Name is required.'; errEl.style.display = 'block'; } return; }
   if (errEl) errEl.style.display = 'none';
-
   const updated = [...PM_STATE.vendors, { category, name, email, phone, notes }];
   await persistSharedVendors(updated);
-
-  catEl.value = '';
-  nameEl.value = '';
-  emailEl.value = '';
-  phoneEl.value = '';
-  notesEl.value = '';
+  catEl.value = ''; nameEl.value = ''; emailEl.value = ''; phoneEl.value = ''; notesEl.value = '';
 }
 
-async function moveSharedVendor(index, delta) {
-  const targetIdx = index + delta;
-  if (targetIdx < 0 || targetIdx >= PM_STATE.vendors.length) return;
-  const updated = [...PM_STATE.vendors];
-  const temp = updated[index];
-  updated[index] = updated[targetIdx];
-  updated[targetIdx] = temp;
-  await persistSharedVendors(updated);
-}
-
-async function removeSharedVendor(index) {
-  const updated = PM_STATE.vendors.filter((_, i) => i !== index);
-  await persistSharedVendors(updated);
-}
-
+async function moveSharedVendor(index, delta) { const targetIdx = index + delta; if (targetIdx < 0 || targetIdx >= PM_STATE.vendors.length) return; const updated = [...PM_STATE.vendors]; const temp = updated[index]; updated[index] = updated[targetIdx]; updated[targetIdx] = temp; await persistSharedVendors(updated); }
+async function removeSharedVendor(index) { const updated = PM_STATE.vendors.filter((_, i) => i !== index); await persistSharedVendors(updated); }
 async function persistSharedVendors(vendorsList) {
-  const errEl = document.getElementById('sharedVendorsError');
-  const okEl = document.getElementById('settVendorsSuccess');
-  if (errEl) errEl.style.display = 'none';
-
-  PM_STATE.vendors = vendorsList;
-  renderSharedVendorsList();
-
+  const errEl = document.getElementById('sharedVendorsError'); const okEl = document.getElementById('settVendorsSuccess'); if (errEl) errEl.style.display = 'none';
+  PM_STATE.vendors = vendorsList; renderSharedVendorsList();
   try {
-    const res = await postPmCommandCenter({
-      action: 'save_vendors',
-      vendors: vendorsList
-    });
-    if (Array.isArray(res.vendors)) {
-      PM_STATE.vendors = res.vendors;
-      renderSharedVendorsList();
-    }
-    if (okEl) {
-      okEl.style.display = 'flex';
-      setTimeout(() => okEl.style.display = 'none', 2200);
-    }
-  } catch (err) {
-    if (errEl) {
-      errEl.textContent = 'Failed to save to Google Sheets: ' + err.message;
-      errEl.style.display = 'block';
-    }
-  }
+    const res = await postPmCommandCenter({ action: 'save_vendors', vendors: vendorsList });
+    if (Array.isArray(res.vendors)) { PM_STATE.vendors = res.vendors; renderSharedVendorsList(); }
+    if (okEl) { okEl.style.display = 'flex'; setTimeout(() => okEl.style.display = 'none', 2200); }
+  } catch (err) { if (errEl) { errEl.textContent = 'Failed to save to Google Sheets: ' + err.message; errEl.style.display = 'block'; } }
 }
 
-function renderTagList(biz, type) { const container = document.getElementById(`tags-${biz}-${type === 'cards' ? 'cards' : 'props'}`); if (!container) return; const items = CFG[biz][type === 'cards' ? 'cards' : 'props']; container.innerHTML = ''; if (!items.length) { container.innerHTML = `<span class="tag-empty">No ${type === 'cards' ? 'card numbers' : 'properties'} added yet</span>`; return; } items.forEach((item, i) => { const tag = document.createElement('div'); tag.className = 'tag-item'; tag.innerHTML = `<span>${item}</span><button class="tag-remove" onclick="removeTag('${biz}','${type === 'cards' ? 'cards' : 'props'}',${i})" title="Remove">×</button>`; container.appendChild(tag); }); }
-function addTag(biz, type) { const key = type === 'cards' ? 'cards' : 'props'; const input = document.getElementById(`add-${biz}-${type === 'cards' ? 'cards' : 'props'}`); const val = input.value.trim(); if (!val) return; if (type === 'cards' && !/^\d{4}$/.test(val)) { input.style.borderColor = 'var(--danger)'; setTimeout(() => input.style.borderColor = '', 1500); return; } if (CFG[biz][key].includes(val)) { input.value = ''; return; } CFG[biz][key].push(val); persistCFG(); input.value = ''; renderTagList(biz, type); if (type === 'props' && STATE.business === biz) { buildPropertyList(); } }
-function removeTag(biz, key, index) { CFG[biz][key].splice(index, 1); persistCFG(); renderTagList(biz, key === 'cards' ? 'cards' : 'props'); if (key === 'props' && STATE.business === biz) { buildPropertyList(); if (STATE.property && !CFG[biz].props.includes(STATE.property)) { STATE.property = null; } } }
+function renderTagList(biz, type) { const container = document.getElementById(`tags-${biz}-${type === 'cards' ? 'cards' : 'props'}`); if (!container) return; const items = CFG[biz][type === 'cards' ? 'cards' : 'props']; if(!items) return; container.innerHTML = ''; if (!items.length) { container.innerHTML = `<span class="tag-empty">No ${type === 'cards' ? 'card numbers' : 'properties'} added yet</span>`; return; } items.forEach((item, i) => { const tag = document.createElement('div'); tag.className = 'tag-item'; tag.innerHTML = `<span>${item}</span><button class="tag-remove" onclick="removeTag('${biz}','${type === 'cards' ? 'cards' : 'props'}',${i})" title="Remove">×</button>`; container.appendChild(tag); }); }
+function addTag(biz, type) { const key = type === 'cards' ? 'cards' : 'props'; const input = document.getElementById(`add-${biz}-${type === 'cards' ? 'cards' : 'props'}`); const val = input.value.trim(); if (!val) return; if (type === 'cards' && !/^\d{4}$/.test(val)) { input.style.borderColor = 'var(--danger)'; setTimeout(() => input.style.borderColor = '', 1500); return; } if (CFG[biz][key].includes(val)) { input.value = ''; return; } CFG[biz][key].push(val); persistCFG(); input.value = ''; renderTagList(biz, type); }
+function removeTag(biz, key, index) { CFG[biz][key].splice(index, 1); persistCFG(); renderTagList(biz, key === 'cards' ? 'cards' : 'props'); }
 function saveVisionKey() { const key = document.getElementById('settVisionKey').value.trim(); if (!key) return; CFG.visionApiKey = key; persistCFG(); document.getElementById('settVisionSuccess').style.display = 'flex'; setTimeout(() => document.getElementById('settVisionSuccess').style.display = 'none', 2500); }
 function saveNotifySettings() { CFG.notifyEmail = document.getElementById('settNotifyEmail').value.trim(); CFG.notifyExpenses = document.getElementById('notifyExpenses').checked; CFG.notifyRent = document.getElementById('notifyRent').checked; persistCFG(); const s = document.getElementById('settNotifySuccess'); if (s) { s.style.display = 'flex'; setTimeout(() => s.style.display = 'none', 2000); } }
 function loadNotifySettings() { const emailEl = document.getElementById('settNotifyEmail'); const expEl = document.getElementById('notifyExpenses'); const rentEl = document.getElementById('notifyRent'); if (emailEl) emailEl.value = CFG.notifyEmail || ''; if (expEl) expEl.checked = CFG.notifyExpenses || false; if (rentEl) rentEl.checked = CFG.notifyRent || false; }
 function saveUrlFromSettings() { const url = document.getElementById('settWebAppUrl').value.trim(); if (url && url.startsWith('https://script.google.com')) { CFG.webAppUrl = url; persistCFG(); document.getElementById('settUrlSuccess').style.display = 'flex'; setTimeout(() => document.getElementById('settUrlSuccess').style.display = 'none', 2500); } }
-function addPropAbbr() { const propName = document.getElementById('abbrPropName').value.trim(); const abbr = document.getElementById('abbrPropVal').value.trim().toUpperCase(); if (!propName || !abbr) return; if (!CFG.propertyAbbreviations) CFG.propertyAbbreviations = {}; CFG.propertyAbbreviations[propName] = abbr; persistCFG(); document.getElementById('abbrPropName').value = ''; document.getElementById('abbrPropVal').value = ''; renderPropAbbrList(); }
-function removePropAbbr(propName) { if (CFG.propertyAbbreviations) { delete CFG.propertyAbbreviations[propName]; persistCFG(); renderPropAbbrList(); } }
-function renderPropAbbrList() { const container = document.getElementById('propAbbrList'); if (!container) return; const overrides = CFG.propertyAbbreviations || {}; const entries = Object.entries(overrides); if (!entries.length) { container.innerHTML = '<div class="tag-empty">No overrides set</div>'; return; } container.innerHTML = ''; entries.forEach(([prop, abbr]) => { const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;'; row.innerHTML = `<span style="color:var(--text-muted)">${prop}</span><span style="display:flex;align-items:center;gap:10px"><span style="color:var(--accent);font-weight:700">${abbr}</span><button class="tag-remove" onclick="removePropAbbr('${prop.replace(/'/g,"\\'")}')">×</button></span>`; container.appendChild(row); }); }
 function renderStoreHelperList() { const container = document.getElementById('storeHelperList'); if (!container) return; const helpers = CFG.storeHelpers || []; if (!helpers.length) { container.innerHTML = '<div class="tag-empty">No custom helpers</div>'; return; } container.innerHTML = ''; helpers.forEach((h, i) => { const row = document.createElement('div'); row.style.cssText = 'display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);font-size:13px;'; row.innerHTML = `<span style="color:var(--text-muted);font-size:12px;flex:1">"${h.keywords[0]}"</span><span style="color:var(--accent);font-weight:700;flex:1">→ ${h.name}</span><button class="tag-remove" onclick="removeStoreHelper(${i})">×</button>`; container.appendChild(row); }); }
 function addStoreHelper() { const kwInput = document.getElementById('storeHelperKw'); const nmInput = document.getElementById('storeHelperName'); const kw = kwInput.value.trim().toLowerCase(); const name = nmInput.value.trim(); if (!kw || !name) return; if (!CFG.storeHelpers) CFG.storeHelpers = []; CFG.storeHelpers.push({ keywords: [kw], name }); persistCFG(); kwInput.value = ''; nmInput.value = ''; renderStoreHelperList(); }
 function removeStoreHelper(index) { if (!CFG.storeHelpers) return; CFG.storeHelpers.splice(index, 1); persistCFG(); renderStoreHelperList(); }
-function confirmReset() { if (confirm('Reset defaults?')) { CFG.LNI = { cards: [...DEFAULTS.LNI.cards], props: [...DEFAULTS.LNI.props] }; CFG.LNEP = { cards: [...DEFAULTS.LNEP.cards], props: [...DEFAULTS.LNEP.props] }; persistCFG(); renderTagList('LNI', 'cards'); renderTagList('LNEP', 'cards'); renderTagList('LNI', 'props'); renderTagList('LNEP', 'props'); updateBusinessSubtitles(); } }
+function confirmReset() { if (confirm('Reset defaults?')) { CFG.LNI = { cards: ['6247','1334','1326','6254'] }; CFG.LNEP = { cards: ['3323','4134','4126','3331'] }; persistCFG(); renderTagList('LNI', 'cards'); renderTagList('LNEP', 'cards'); updateBusinessSubtitles(); } }
 function updateBusinessSubtitles() { const lniSub = document.getElementById('sub-LNI'); const lnepSub = document.getElementById('sub-LNEP'); if (lniSub) lniSub.textContent = 'Cards ending in ' + (CFG.LNI.cards.join(', ') || 'none set'); if (lnepSub) lnepSub.textContent = 'Cards ending in ' + (CFG.LNEP.cards.join(', ') || 'none set'); }
 function saveConfig() { const url = document.getElementById('configUrl').value.trim(); const err = document.getElementById('configUrlError'); if (!url.startsWith('https://script.google.com')) { err.textContent = 'Please enter a valid Apps Script Web App URL.'; err.style.display = 'block'; return; } err.style.display = 'none'; CFG.webAppUrl = url; persistCFG(); document.getElementById('settingsOpenBtn').style.display = 'flex'; goToScreen('hub'); }
 
@@ -1584,6 +1497,9 @@ async function fetchPmCommandCenterData(forceRefresh) {
   PM_STATE.workOrders = Array.isArray(data.workOrders) ? data.workOrders : [];
   PM_STATE.vendors = Array.isArray(data.vendors) ? data.vendors : [];
   PM_STATE.specs = Array.isArray(data.specs) ? data.specs : [];
+  if (Array.isArray(data.properties) && data.properties.length > 0) {
+    MASTER_PROPERTIES = data.properties;
+  }
   PM_STATE.loaded = true;
 }
 
@@ -1678,7 +1594,9 @@ async function saveWorkOrderChanges() {
   try { await postPmCommandCenter({ action: 'update_work_order', ticketId: wo.ticketId, status: document.getElementById('woEditStatus').value, vendorName: document.getElementById('woEditVendor').value.trim(), vendorContact: document.getElementById('woEditVendorContact').value.trim(), apptDate: document.getElementById('woEditAppt').value.trim(), notes: document.getElementById('woEditNote').value.trim(), notifyTenant: notifyTenant, tenantMessage: document.getElementById('woEditTenantSms').value.trim() }); closeModal('woDetailModal'); PM_STATE.loaded = false; await initWorkOrdersScreen(); } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; } finally { btn.disabled = false; btn.textContent = 'Save Work Order Updates'; }
 }
 function openNewWorkOrderModal() {
-  const datalist = document.getElementById('pmAddressOptions'); datalist.innerHTML = ''; PM_STATE.leases.forEach(l => { if (l.address) { const opt = document.createElement('option'); opt.value = l.address; datalist.appendChild(opt); } });
+  const datalist = document.getElementById('pmAddressOptions'); datalist.innerHTML = '';
+  const allAddrs = [...new Set([...MASTER_PROPERTIES.map(p => p.address), ...PM_STATE.leases.map(l => l.address)])].filter(Boolean);
+  allAddrs.forEach(addr => { const opt = document.createElement('option'); opt.value = addr; datalist.appendChild(opt); });
   document.getElementById('newWoAddress').value = ''; document.getElementById('newWoTenant').value = ''; document.getElementById('newWoPhone').value = ''; document.getElementById('newWoIssue').value = ''; document.getElementById('newWoNotifyToggle').classList.remove('active'); document.getElementById('newWoError').style.display = 'none'; document.getElementById('woCreateModal').classList.add('open');
 }
 function autofillNewWoTenant() { const addr = document.getElementById('newWoAddress').value.trim().toLowerCase(); if (!addr) return; const match = PM_STATE.leases.find(l => (l.address || '').toLowerCase() === addr); if (match) { document.getElementById('newWoTenant').value = match.displayName || match.tenant1Name || ''; document.getElementById('newWoPhone').value = match.tenant1Phone || ''; } }
@@ -1837,10 +1755,14 @@ async function sendDirectLeaseSms() {
   try { await postPmCommandCenter({ action: 'send_sms', to: to, message: message }); closeModal('leaseDetailModal'); } catch (err) { errEl.textContent = err.message; errEl.style.display = 'block'; } finally { btn.disabled = false; btn.textContent = 'Send SMS Now'; }
 }
 
-function openNewTenantModal() {
+async function openNewTenantModal() {
   const sel = document.getElementById('newTenantAddress');
   sel.innerHTML = '<option value="">Select Property...</option>';
-  const uniqueProps = [...new Set(PM_STATE.leases.map(l => l.address))].filter(Boolean).sort();
+  
+  if (!MASTER_PROPERTIES.length) {
+    await syncPropertiesFromSheet();
+  }
+  const uniqueProps = [...new Set([...MASTER_PROPERTIES.map(p => p.address), ...PM_STATE.leases.map(l => l.address)])].filter(Boolean).sort();
   uniqueProps.forEach(addr => {
     const opt = document.createElement('option');
     opt.value = addr; opt.textContent = addr;
@@ -2046,12 +1968,14 @@ function parseReceiptText(text) {
 function selectBusiness(biz) { STATE.business = biz; document.querySelectorAll('.checkbox-card[id^="card-"]').forEach(c => c.classList.remove('selected')); document.getElementById('card-' + biz).classList.add('selected'); document.getElementById('businessNextBtn').disabled = false; }
 function toggleBizExpense() { STATE.isBusinessExpense = !STATE.isBusinessExpense; document.getElementById('bizExpenseToggle').classList.toggle('active', STATE.isBusinessExpense); }
 function suggestBusiness() { const last4 = STATE.scanned.cardLast4; if (!last4) return; for (const biz of ['LNI', 'LNEP']) { if (CFG[biz].cards.includes(last4)) { selectBusiness(biz); document.getElementById('badge-' + biz).style.display = 'flex'; break; } } }
-function buildPropertyList() {
+
+async function buildPropertyList() {
   const list = document.getElementById('propertyList'); list.innerHTML = '';
-  let props = [];
-  if (propertyTotalsCache && propertyTotalsCache._business === STATE.business) { props = Object.keys(propertyTotalsCache).filter(k => !k.startsWith('_')); }
-  if (!props.length) { props = CFG[STATE.business] ? CFG[STATE.business].props : []; }
-  if (!props.length) { list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:16px 0">No properties configured. Open Settings ⚙ to add some.</div>'; return; }
+  if (!MASTER_PROPERTIES.length) {
+    await syncPropertiesFromSheet();
+  }
+  const props = MASTER_PROPERTIES.filter(p => p.business === STATE.business).map(p => p.name);
+  if (!props.length) { list.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:16px 0">No active properties synced from Property Master.</div>'; return; }
   props.forEach(p => {
     const card = document.createElement('div'); card.className = 'checkbox-card' + (STATE.property === p ? ' selected' : '');
     let totalBadge = '';
@@ -2061,6 +1985,7 @@ function buildPropertyList() {
     list.appendChild(card);
   });
 }
+
 function prefillVendor() { const input = document.getElementById('vendorInput'); const hint = document.getElementById('vendorHint'); if (STATE.scanned.vendor && !input.value) { input.value = STATE.scanned.vendor; hint.textContent = 'Auto-filled from receipt scan'; hint.className = 'field-hint scanned'; } STATE.vendor = input.value; checkVendorNext(); }
 function checkVendorNext() { STATE.vendor = document.getElementById('vendorInput').value.trim(); document.getElementById('vendorNextBtn').disabled = STATE.vendor.length === 0; }
 function prefillDate() { const hint = document.getElementById('dateHint'); if (STATE.scanned.date && !STATE.date) { selectDate(STATE.scanned.date); hint.textContent = 'Auto-filled from receipt scan'; hint.className = 'field-hint scanned'; } else { renderCalendar(); } }
@@ -2144,10 +2069,12 @@ function buildSummary() {
 
 function getDateStr() { return STATE.date ? `${STATE.date.getFullYear()}-${String(STATE.date.getMonth()+1).padStart(2,'0')}-${String(STATE.date.getDate()).padStart(2,'0')}` : new Date().toISOString().split('T')[0]; }
 function getPropertyAbbr() {
-  if (STATE.isBusinessExpense) return STATE.business; const userOverrides = CFG.propertyAbbreviations || {}; if (userOverrides[STATE.property]) return userOverrides[STATE.property];
-  const defaults = { 'Letitia': 'Let', 'Cornerstone': 'CS', 'Parkridge': 'PR', 'Beau Darren': 'BD', 'Briarhurst': 'BH', 'Rue De Belle Maison': 'RDB', };
-  if (defaults[STATE.property]) return defaults[STATE.property]; return (STATE.property || '').split(/\s+/).map(w => w.charAt(0).toUpperCase()).join('');
+  if (STATE.isBusinessExpense) return STATE.business; 
+  const match = MASTER_PROPERTIES.find(p => p.name === STATE.property);
+  if (match && match.abbr) return match.abbr;
+  return (STATE.property || '').split(/\s+/).map(w => w.charAt(0).toUpperCase()).join('');
 }
+
 async function submitEntry() {
   const btn = document.getElementById('submitBtn'); const errEl = document.getElementById('submitError');
   btn.disabled = true; btn.textContent = 'Checking for duplicates…'; errEl.style.display = 'none';
@@ -2250,13 +2177,15 @@ function selectTenant(idx) {
   else { propPicker.style.display = 'none'; RENT_STATE.selectedProperty = t.property; RENT_STATE.selectedBusiness = t.business; }
   showRentFields(t);
 }
-function buildRentPropertyPicker() {
-  const allProps = [ ...CFG.LNI.props.map(p => ({ prop: p, biz: 'LNI' })), ...CFG.LNEP.props.map(p => ({ prop: p, biz: 'LNEP' })) ];
+async function buildRentPropertyPicker() {
   const list = document.getElementById('rentPropertyList'); list.innerHTML = '';
-  allProps.forEach(({ prop, biz }) => {
-    const card = document.createElement('div'); card.className = 'checkbox-card' + (RENT_STATE.selectedProperty === prop ? ' selected' : '');
-    card.innerHTML = `<div class="cb-box"><svg class="cb-check" width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div style="flex:1"><div class="cb-label">${prop}</div><div class="cb-sub">${biz === 'LNI' ? 'LN Investments' : 'LNE Properties'}</div></div>`;
-    card.onclick = () => { RENT_STATE.selectedProperty = prop; RENT_STATE.selectedBusiness = biz; document.querySelectorAll('#rentPropertyList .checkbox-card').forEach(c => c.classList.remove('selected')); card.classList.add('selected'); const t = RENT_STATE.tenants[RENT_STATE.selectedTenant]; showRentFields(t); };
+  if (!MASTER_PROPERTIES.length) {
+    await syncPropertiesFromSheet();
+  }
+  MASTER_PROPERTIES.forEach(p => {
+    const card = document.createElement('div'); card.className = 'checkbox-card' + (RENT_STATE.selectedProperty === p.name ? ' selected' : '');
+    card.innerHTML = `<div class="cb-box"><svg class="cb-check" width="11" height="9" viewBox="0 0 11 9" fill="none"><path d="M1 4.5L4 7.5L10 1" stroke="#000" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div style="flex:1"><div class="cb-label">${p.name}</div><div class="cb-sub">${p.business === 'LNI' ? 'LN Investments' : 'LNE Properties'}</div></div>`;
+    card.onclick = () => { RENT_STATE.selectedProperty = p.name; RENT_STATE.selectedBusiness = p.business; document.querySelectorAll('#rentPropertyList .checkbox-card').forEach(c => c.classList.remove('selected')); card.classList.add('selected'); const t = RENT_STATE.tenants[RENT_STATE.selectedTenant]; showRentFields(t); };
     list.appendChild(card);
   });
 }
@@ -2308,17 +2237,9 @@ async function submitRent() {
 }
 
 // ════════════════════════════════════════════
-// REPS ENTRY (DYNAMIC YEAR-MATCHED PROPERTIES)
+// REPS ENTRY (PULLED FROM MASTER_PROPERTIES)
 // ════════════════════════════════════════════
-const REPS_STATE = { date: null, calYear: new Date().getFullYear(), calMonth: new Date().getMonth(), loadedYear: null, placesCache: {} };
-
-function simplifyRepsPlaceLabel(name) {
-  const clean = String(name || '').trim();
-  const overrides = { 'Rue De Belle Maison': 'Rue' };
-  if (overrides[clean]) return overrides[clean];
-  const words = clean.split(/\s+/);
-  return words.length >= 4 ? words[0] : clean;
-}
+const REPS_STATE = { date: null, calYear: new Date().getFullYear(), calMonth: new Date().getMonth() };
 
 function initRepsScreen() {
   const errEl = document.getElementById('repsError'); if (errEl) errEl.style.display = 'none';
@@ -2330,81 +2251,31 @@ function initRepsScreen() {
     document.getElementById('repsDateInput').value = (today.getMonth()+1) + '/' + today.getDate() + '/' + today.getFullYear();
   }
   renderRepsCalendar();
-  const targetYear = REPS_STATE.date ? REPS_STATE.date.getFullYear() : new Date().getFullYear();
-  loadRepsPlacesForYear(targetYear);
+  loadRepsPlaces();
   checkRepsNext();
 }
 
-async function loadRepsPlacesForYear(year) {
-  const loadingEl = document.getElementById('repsPlaceLoading');
-  const yearTag = document.getElementById('repsPlaceYearTag');
-  if (yearTag) yearTag.textContent = `(${year} Sheet)`;
-
-  if (REPS_STATE.placesCache[year]) {
-    REPS_STATE.loadedYear = year;
-    renderRepsPlaceButtons(REPS_STATE.placesCache[year]);
-    return;
-  }
-
-  if (loadingEl) loadingEl.style.display = 'flex';
-  const collected = [];
-
-  if (CFG.webAppUrl) {
-    try {
-      const [lniResp, lnepResp] = await Promise.all([
-        fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year + '&business=LNI&_t=' + Date.now()),
-        fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year + '&business=LNEP&_t=' + Date.now())
-      ]);
-      const lniData = await lniResp.json();
-      const lnepData = await lnepResp.json();
-      if (!lniData.error && lniData.totals) {
-        Object.keys(lniData.totals).filter(k => !k.startsWith('_')).forEach(p => collected.push(p));
-      }
-      if (!lnepData.error && lnepData.totals) {
-        Object.keys(lnepData.totals).filter(k => !k.startsWith('_')).forEach(p => collected.push(p));
-      }
-    } catch (e) {
-      console.warn('Could not fetch REPS properties for year ' + year, e);
-    }
-  }
-
-  // Fallback to locally synced property list if offline or sheet tab not found
-  if (!collected.length) {
-    [...(CFG.LNI?.props || []), ...(CFG.LNEP?.props || [])].forEach(p => collected.push(p));
-  }
-
-  // Deduplicate properties & combine with business/portfolio options
-  const uniqueProps = [...new Set(collected.map(p => String(p).trim()).filter(Boolean))];
-  const entityOptions = ['LN Investments', 'LNE Properties', 'Portfolio'];
-  const combined = [...uniqueProps];
-  entityOptions.forEach(ent => {
-    if (!combined.some(x => x.toLowerCase() === ent.toLowerCase())) combined.push(ent);
-  });
-
-  const placeItems = combined.map(fullName => ({
-    label: simplifyRepsPlaceLabel(fullName),
-    value: simplifyRepsPlaceLabel(fullName)
-  }));
-
-  REPS_STATE.placesCache[year] = placeItems;
-  REPS_STATE.loadedYear = year;
-  if (loadingEl) loadingEl.style.display = 'none';
-  renderRepsPlaceButtons(placeItems);
-}
-
-function renderRepsPlaceButtons(items) {
+async function loadRepsPlaces() {
   const container = document.getElementById('repsPlaceBtns');
   if (!container) return;
+  if (!MASTER_PROPERTIES.length) {
+    await syncPropertiesFromSheet();
+  }
   const currentVal = (document.getElementById('repsPlaceInput').value || '').trim().toLowerCase();
   container.innerHTML = '';
+  
+  const items = ['LN Investments', 'LNE Properties', 'Portfolio'];
+  MASTER_PROPERTIES.forEach(p => {
+    if (!items.includes(p.name)) items.push(p.name);
+  });
 
-  items.forEach(item => {
+  items.forEach(label => {
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'cat-card' + (currentVal && currentVal === item.value.toLowerCase() ? ' selected' : '');
+    btn.className = 'cat-card' + (currentVal && currentVal === label.toLowerCase() ? ' selected' : '');
     btn.style.cssText = 'font-size:12px;padding:8px 12px;border-radius:20px;flex:none';
-    btn.textContent = item.label;
-    btn.onclick = () => selectRepsPlace(item.value, btn);
+    btn.textContent = label;
+    btn.onclick = () => selectRepsPlace(label, btn);
     container.appendChild(btn);
   });
 }
@@ -2419,7 +2290,6 @@ function parseRepsDateInput(val) {
       if (!isNaN(d)) {
         REPS_STATE.date = d; REPS_STATE.calYear = yr; REPS_STATE.calMonth = mo - 1;
         renderRepsCalendar();
-        if (REPS_STATE.loadedYear !== yr) loadRepsPlacesForYear(yr);
         checkRepsNext();
       }
     }
@@ -2439,7 +2309,6 @@ function renderRepsCalendar() {
       REPS_STATE.date = new Date(pickedYear, REPS_STATE.calMonth, d);
       document.getElementById('repsDateInput').value = (REPS_STATE.calMonth+1) + '/' + d + '/' + pickedYear;
       renderRepsCalendar();
-      if (REPS_STATE.loadedYear !== pickedYear) loadRepsPlacesForYear(pickedYear);
       checkRepsNext();
     };
     cells.appendChild(el);
@@ -2473,15 +2342,34 @@ async function loadPropertyTotals() {
     const year = STATE.date ? STATE.date.getFullYear() : new Date().getFullYear();
     const resp = await fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year + '&business=' + STATE.business);
     const data = await resp.json();
-    if (!data.error) { const names = Object.keys(data.totals); if (names.length) { CFG[STATE.business].props = names; persistCFG(); } propertyTotalsCache = data.totals; propertyTotalsCache._business = STATE.business; rebuildPropertyListWithTotals(); }
+    if (!data.error) { propertyTotalsCache = data.totals; propertyTotalsCache._business = STATE.business; rebuildPropertyListWithTotals(); }
   } catch(e) { console.error("Failed to load totals:", e); }
   if (loading) loading.style.display = 'none';
 }
 function rebuildPropertyListWithTotals() { const loading = document.getElementById('propTotalsLoading'); if (loading) loading.style.display = 'none'; buildPropertyList(); }
+
 async function syncPropertiesFromSheet() {
-  const year = new Date().getFullYear();
-  for (const biz of ['LNI', 'LNEP']) { try { const resp = await fetch(CFG.webAppUrl + '?action=getPropertyTotals&year=' + year + '&business=' + biz); const data = await resp.json(); if (data.error || !data.totals) continue; const names = Object.keys(data.totals); if (names.length) CFG[biz].props = names; } catch(e) {} }
-  persistCFG();
+  try {
+    if (CFG.webAppUrl) {
+      const resp = await fetch(CFG.webAppUrl + '?action=get_properties&_t=' + Date.now());
+      const data = await resp.json();
+      if (data.success && Array.isArray(data.properties) && data.properties.length > 0) {
+        MASTER_PROPERTIES = data.properties;
+        return;
+      }
+    }
+    if (CFG.pmWebAppUrl) {
+      const params = new URLSearchParams({ action: 'get_properties', _t: Date.now() });
+      if (CFG.pmSecret && CFG.pmSecret !== 'REPLACE_WITH_A_LONG_RANDOM_STRING') params.set('secret', CFG.pmSecret);
+      const resp = await fetch(CFG.pmWebAppUrl + '?' + params.toString());
+      const data = await resp.json();
+      if (data.success && Array.isArray(data.properties)) {
+        MASTER_PROPERTIES = data.properties;
+      }
+    }
+  } catch (e) {
+    console.error("Failed to sync master properties:", e);
+  }
 }
 
 function clearField(id) { document.getElementById(id).value = ''; document.getElementById(id).dispatchEvent(new Event('input')); }
